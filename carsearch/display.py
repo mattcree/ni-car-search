@@ -58,11 +58,39 @@ def display_errors(errors: dict[str, str]):
             print(f"  [!] {name}: {err}", file=sys.stderr)
 
 
-def display_summary(total: int):
+def display_summary(total: int, duplicate_count: int = 0):
     if RICH:
-        _console.print(f"\n[bold]{total} total listings[/bold]")
+        msg = f"\n[bold]{total} total listings[/bold]"
+        if duplicate_count:
+            msg += f" [dim]({duplicate_count} probable duplicates across sites)[/dim]"
+        _console.print(msg)
     else:
-        print(f"\n{total} total listings")
+        msg = f"\n{total} total listings"
+        if duplicate_count:
+            msg += f" ({duplicate_count} probable duplicates across sites)"
+        print(msg)
+
+
+def display_duplicates(clusters: list[list]):
+    if not clusters:
+        return
+
+    if RICH:
+        _console.print(f"\n[bold yellow]Probable duplicates ({len(clusters)} cars listed on multiple sites):[/bold yellow]")
+        for i, cluster in enumerate(clusters, 1):
+            _console.print(f"\n  [yellow]Duplicate #{i}:[/yellow]")
+            for r in cluster:
+                _console.print(
+                    f"    [{r.source:10s}]  {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}"
+                )
+                _console.print(f"                 [dim]{r.link}[/dim]")
+    else:
+        print(f"\nProbable duplicates ({len(clusters)} cars listed on multiple sites):")
+        for i, cluster in enumerate(clusters, 1):
+            print(f"\n  Duplicate #{i}:")
+            for r in cluster:
+                print(f"    [{r.source:10s}]  {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}")
+                print(f"                 {r.link}")
 
 
 def display_diff(diff_result: dict, prev_timestamp: str):

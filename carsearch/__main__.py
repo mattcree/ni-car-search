@@ -4,7 +4,8 @@ import argparse
 import asyncio
 
 from .base import Filters, resolve_location, resolve_make
-from .display import display_diff, display_errors, display_summary, emit
+from .dedup import find_duplicates
+from .display import display_diff, display_duplicates, display_errors, display_summary, emit
 from .runner import run
 from .snapshot import diff, load, save
 
@@ -70,7 +71,12 @@ def main():
     # Run search
     results, errors = asyncio.run(run(make, model, filters, on_results=emit))
     display_errors(errors)
-    display_summary(len(results))
+
+    # Duplicate detection
+    clusters = find_duplicates(results)
+    dup_count = sum(len(c) - 1 for c in clusters)  # extra listings beyond the first
+    display_summary(len(results), dup_count)
+    display_duplicates(clusters)
 
     # Compare and save snapshot
     if not args.no_snapshot:
