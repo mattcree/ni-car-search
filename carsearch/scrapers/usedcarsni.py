@@ -1,0 +1,220 @@
+"""UsedCarsNI scraper.
+
+Method:
+    Browser-based (Playwright + stealth). Uses opaque numeric IDs for
+    make and model, resolved dynamically:
+
+    1. Load usedcarsni.com homepage
+    2. Select make from dropdown (hardcoded make->ID map)
+    3. Wait for model dropdown to populate via JS
+    4. Read options to find model ID (e.g. Superb=1960)
+    5. Construct search URL with exact IDs
+
+    URL: usedcarsni.com/search_results.php?make={id}&model={id}&pagepc0={n}
+
+    Pagination: &pagepc0=N, 20 results per page.
+
+    Data extraction: <article class="car-line"> with DT/DD spec pairs
+    and .euroPrice for price.
+
+Limitations:
+    - Make IDs hardcoded for ~25 common makes.
+    - Cloudflare Turnstile requires stealth bypass.
+    - Model ID resolution adds ~5s (homepage + dropdown interaction).
+"""
+
+from __future__ import annotations
+
+import re
+from urllib.parse import urlencode
+
+from ..base import Filters, Listing, Scraper
+
+MAKE_IDS = {
+    "audi": 1,
+    "bmw": 2,
+    "citroen": 4,
+    "fiat": 6,
+    "ford": 7,
+    "honda": 8,
+    "hyundai": 9,
+    "jaguar": 11,
+    "kia": 13,
+    "land rover": 14,
+    "mazda": 15,
+    "mercedes-benz": 16,
+    "mg": 17,
+    "mini": 18,
+    "nissan": 20,
+    "peugeot": 22,
+    "renault": 24,
+    "seat": 27,
+    "skoda": 28,
+    "toyota": 30,
+    "vauxhall": 31,
+    "volkswagen": 32,
+    "volvo": 33,
+    "dacia": 793,
+}
+
+
+class UsedCarsNIScraper(Scraper):
+    name = "UsedCarsNI"
+    needs_browser = True
+    self_navigates = True
+
+    def build_url(self, make: str, model: str, filters: Filters) -> str:
+        make_id = MAKE_IDS.get(make.lower(), 0)
+        return f"https://www.usedcarsni.com/search_results.php?search_type=1&make={make_id}&model=0&keywords={model}"
+
+    async def _resolve_model_id(self, page, make: str, model: str) -> str | None:
+        await page.goto("https://www.usedcarsni.com", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(3000)
+
+        for sel in ['button:has-text("Accept")', ".fc-cta-consent"]:
+            btn = await page.query_selector(sel)
+            if btn and await btn.is_visible():
+                await btn.click()
+                await page.wait_for_timeout(1000)
+                break
+
+        make_id = str(MAKE_IDS.get(make.lower(), 0))
+        if make_id == "0":
+            return None
+
+        make_select = await page.query_selector('select[name="make"]')
+        if not make_select:
+            return None
+
+        await make_select.select_option(value=make_id)
+        await page.wait_for_timeout(2000)
+
+        model_select = await page.query_selector('select[name="model"]')
+        if not model_select:
+            return None
+
+        options = await model_select.query_selector_all("option")
+        target = model.lower()
+        for opt in options:
+            text = (await opt.inner_text()).strip()
+            val = await opt.get_attribute("value") or "0"
+            name = re.sub(r"\s*\(\d+\)\s*$", "", text).strip().lower()
+            if name == target:
+                return val
+
+        return None
+
+    def _build_results_url(self, make_id: int, model_id: str, filters: Filters, page: int = 1) -> str:
+        params = {
+            "search_type": 1,
+            "make": make_id,
+            "model": model_id,
+            "fuel_type": 0,
+            "trans_type": 0,
+            "body_style": 0,
+            "user_type": 0,
+            "mileage_to": 0,
+            "distance_enabled": 1 if filters.radius else 0,
+            "distance_postcode": filters.postcode if filters.radius else "",
+            "distance_value": filters.radius or 0,
+            "keywords": "",
+            "age_from": filters.min_year or 0,
+            "age_to": filters.max_year or 0,
+            "price_from": filters.min_price or 0,
+            "price_to": filters.max_price or 0,
+        }
+        if page > 1:
+            params["pagepc0"] = page
+        return f"https://www.usedcarsni.com/search_results.php?{urlencode(params)}"
+
+    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
+        model_id = await self._resolve_model_id(page, make, model)
+        if not model_id:
+            raise ValueError(f"Could not find model '{model}' for make '{make}' on UsedCarsNI")
+
+        make_id = MAKE_IDS.get(make.lower(), 0)
+        results = []
+        page_num = 1
+        seen_links: set[str] = set()
+
+        while True:
+            url = self._build_results_url(make_id, model_id, filters, page=page_num)
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(3000)
+
+            for sel in ['button:has-text("Accept")', ".fc-cta-consent"]:
+                btn = await page.query_selector(sel)
+                if btn and await btn.is_visible():
+                    await btn.click()
+                    await page.wait_for_timeout(1000)
+                    break
+
+            try:
+                await page.wait_for_selector("article.car-line", timeout=5000)
+            except Exception:
+                break
+
+            articles = await page.query_selector_all("article.car-line")
+            if not articles:
+                break
+
+            page_results = []
+            for article in articles:
+                listing = await self._extract_listing(article)
+                if listing.link not in seen_links:
+                    seen_links.add(listing.link)
+                    page_results.append(listing)
+
+            if not page_results:
+                break
+
+            results.extend(page_results)
+            if on_page:
+                on_page(page_results)
+
+            # Check for "Next" pagination link
+            has_next = await page.query_selector('.pagination a:has-text("Next")')
+            if not has_next or (filters.max_pages and page_num >= filters.max_pages):
+                break
+            page_num += 1
+
+        return results
+
+    async def _extract_listing(self, article) -> Listing:
+        title_el = await article.query_selector(".car-title a, .car-caption a")
+        raw_title = (await title_el.inner_text()).strip() if title_el else "-"
+        title = " ".join(raw_title.split())
+        href = (await title_el.get_attribute("href")) if title_el else ""
+        if href:
+            clean = href.split("?")[0]
+            link = f"https://www.usedcarsni.com{clean}" if not clean.startswith("http") else clean
+        else:
+            link = "-"
+
+        price_el = await article.query_selector(".euroPrice")
+        raw_price = (await price_el.inner_text()).strip() if price_el else ""
+        raw_price = re.sub(r"[^\d]", "", raw_price)
+        price = f"\u00a3{int(raw_price):,}" if raw_price else "-"
+
+        specs = await self._extract_specs(article)
+
+        year_match = re.search(r"\b(19|20)\d{2}\b", title)
+        year = year_match.group(0) if year_match else "-"
+
+        return Listing(
+            source=self.name, title=title, price=price, year=year,
+            mileage=specs.get("Mileage", "-"), location=specs.get("Location", "-"),
+            link=link,
+        )
+
+    @staticmethod
+    async def _extract_specs(article) -> dict[str, str]:
+        specs = {}
+        dts = await article.query_selector_all("dl.dl-horizontal dt")
+        dds = await article.query_selector_all("dl.dl-horizontal dd")
+        for dt, dd in zip(dts, dds):
+            key = (await dt.inner_text()).strip()
+            val = (await dd.inner_text()).strip()
+            if key and val:
+                specs[key] = val
+        return specs
