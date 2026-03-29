@@ -63,3 +63,53 @@ def display_summary(total: int):
         _console.print(f"\n[bold]{total} total listings[/bold]")
     else:
         print(f"\n{total} total listings")
+
+
+def display_diff(diff_result: dict, prev_timestamp: str):
+    new = diff_result["new"]
+    gone = diff_result["gone"]
+    price_changed = diff_result["price_changed"]
+    unchanged = diff_result["unchanged"]
+
+    if RICH:
+        _console.print(f"\n[bold]Changes since {prev_timestamp}:[/bold]")
+        _console.print(f"  {unchanged} unchanged, [green]+{len(new)} new[/green], [red]-{len(gone)} gone[/red], [yellow]{len(price_changed)} price changed[/yellow]")
+
+        if new:
+            _console.print(f"\n  [green bold]+ New listings ({len(new)}):[/green bold]")
+            for r in sorted(new, key=lambda r: _parse_price(r.price)):
+                _console.print(f"    [green]+[/green] {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}")
+                _console.print(f"             [dim]{r.link}[/dim]")
+
+        if gone:
+            _console.print(f"\n  [red bold]- Gone ({len(gone)}):[/red bold]")
+            for r in sorted(gone, key=lambda r: _parse_price(r.price)):
+                _console.print(f"    [red]-[/red] {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}")
+                _console.print(f"             [dim]{r.link}[/dim]")
+
+        if price_changed:
+            _console.print(f"\n  [yellow bold]~ Price changed ({len(price_changed)}):[/yellow bold]")
+            for r, old_price in sorted(price_changed, key=lambda x: _parse_price(x[0].price)):
+                _console.print(f"    [yellow]~[/yellow] {old_price:>8s} -> {r.price:<8s}  {r.year}  {r.location:20s}  {r.title}")
+                _console.print(f"             [dim]{r.link}[/dim]")
+    else:
+        print(f"\nChanges since {prev_timestamp}:")
+        print(f"  {unchanged} unchanged, +{len(new)} new, -{len(gone)} gone, {len(price_changed)} price changed")
+
+        if new:
+            print(f"\n  + New listings ({len(new)}):")
+            for r in sorted(new, key=lambda r: _parse_price(r.price)):
+                print(f"    + {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}")
+                print(f"             {r.link}")
+
+        if gone:
+            print(f"\n  - Gone ({len(gone)}):")
+            for r in sorted(gone, key=lambda r: _parse_price(r.price)):
+                print(f"    - {r.price:>8s}  {r.year}  {r.mileage:>14s}  {r.location:20s}  {r.title}")
+                print(f"             {r.link}")
+
+        if price_changed:
+            print(f"\n  ~ Price changed ({len(price_changed)}):")
+            for r, old_price in sorted(price_changed, key=lambda x: _parse_price(x[0].price)):
+                print(f"    ~ {old_price:>8s} -> {r.price:<8s}  {r.year}  {r.location:20s}  {r.title}")
+                print(f"             {r.link}")

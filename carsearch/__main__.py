@@ -4,8 +4,9 @@ import argparse
 import asyncio
 
 from .base import Filters, resolve_location, resolve_make
-from .display import display_errors, display_summary, emit
+from .display import display_diff, display_errors, display_summary, emit
 from .runner import run
+from .snapshot import diff, load, save
 
 
 def main():
@@ -21,6 +22,7 @@ def main():
     parser.add_argument("--max-price", type=int, metavar="N", help="Maximum price")
     parser.add_argument("--min-year", type=int, metavar="YEAR", help="Minimum year")
     parser.add_argument("--max-year", type=int, metavar="YEAR", help="Maximum year")
+    parser.add_argument("--no-snapshot", action="store_true", help="Don't save or compare snapshots")
     args = parser.parse_args()
 
     make = resolve_make(args.make)
@@ -60,9 +62,26 @@ def main():
 
     print(f"\nSearching for {label} in {loc_label}...\n")
 
+    # Load previous snapshot
+    previous = None
+    if not args.no_snapshot:
+        previous = load(make, model, filters)
+
+    # Run search
     results, errors = asyncio.run(run(make, model, filters, on_results=emit))
     display_errors(errors)
     display_summary(len(results))
+
+    # Compare and save snapshot
+    if not args.no_snapshot:
+        if previous:
+            prev_ts = previous["search"].get("timestamp", "unknown")
+            diff_result = diff(previous, results)
+            display_diff(diff_result, prev_ts)
+
+        path = save(make, model, filters, results)
+        print(f"\n  Snapshot saved: {path}")
+
     print()
 
 
