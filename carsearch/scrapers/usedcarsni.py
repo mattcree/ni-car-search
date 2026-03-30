@@ -204,7 +204,7 @@ class UsedCarsNIScraper(Scraper):
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=specs.get("Mileage", "-"), location=specs.get("Location", "-"),
-            link=link,
+            link=link, body=specs.get("Body Style", "-"),
         )
 
     @staticmethod

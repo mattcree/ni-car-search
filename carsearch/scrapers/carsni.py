@@ -115,6 +115,14 @@ class CarsNIScraper(Scraper):
         if loc_el:
             location = (await loc_el.inner_text()).strip()
 
+        # Body type from full text
+        body = "-"
+        full_lower = full_text.lower()
+        for bt in ["estate", "hatchback", "saloon", "suv", "coupe", "convertible", "mpv", "pickup", "sedan"]:
+            if bt in full_lower:
+                body = bt.title()
+                break
+
         # Apply year filters
         if filters.min_year or filters.max_year:
             try:
@@ -134,4 +142,5 @@ class CarsNIScraper(Scraper):
             mileage=mileage,
             location=location,
             link=link,
+            body=body,
         )

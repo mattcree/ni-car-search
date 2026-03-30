@@ -131,7 +131,15 @@ class AutoTraderScraper(Scraper):
         loc_el = await card.query_selector('[data-testid="search-listing-location"] span')
         location = (await loc_el.inner_text()).strip() if loc_el else "-"
 
+        # Body type from subtitle text
+        body = "-"
+        sub_lower = subtitle.lower()
+        for bt in ["estate", "hatchback", "saloon", "suv", "coupe", "convertible", "mpv", "pickup"]:
+            if bt in sub_lower:
+                body = bt.title()
+                break
+
         return Listing(
             source=self.name, title=title, price=price, year=year,
-            mileage=mileage, location=location, link=link,
+            mileage=mileage, location=location, link=link, body=body,
         )

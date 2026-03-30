@@ -139,6 +139,16 @@ class GumtreeScraper(Scraper):
         location_el = await article.query_selector('[data-q="tile-location"]')
         location = (await location_el.inner_text()).strip() if location_el else "-"
 
+        # Body type from data attribute or title text
+        body_el = await article.query_selector('[data-q="motors-body-type"]')
+        body = (await body_el.inner_text()).strip() if body_el else "-"
+        if body == "-":
+            title_lower = title.lower()
+            for bt in ["estate", "hatchback", "saloon", "suv", "coupe", "convertible", "mpv"]:
+                if bt in title_lower:
+                    body = bt.title()
+                    break
+
         if filters.min_year or filters.max_year:
             try:
                 y = int(year)
@@ -151,5 +161,5 @@ class GumtreeScraper(Scraper):
 
         return Listing(
             source=self.name, title=title, price=price, year=year,
-            mileage=mileage, location=location, link=link,
+            mileage=mileage, location=location, link=link, body=body,
         )

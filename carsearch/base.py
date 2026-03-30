@@ -13,6 +13,7 @@ class Listing:
     mileage: str
     location: str
     link: str
+    body: str = "-"
 
 
 NI_LOCATIONS = {

@@ -137,13 +137,19 @@ class MotorsScraper(Scraper):
         price = (await price_el.inner_text()).strip() if price_el else "-"
 
         # Specs: list items in .result-card__vehicle-info
+        # Typical order: engine size, mileage, fuel, transmission, body type
         mileage = "-"
+        body = "-"
+        body_types = {"hatchback", "estate", "saloon", "suv", "coupe", "convertible",
+                      "mpv", "pickup", "van", "sedan", "cabriolet", "limousine"}
         specs = await card.query_selector_all(".result-card__vehicle-info li")
         for s in specs:
             text = (await s.inner_text()).strip().replace("\n", " ")
-            if "mile" in text.lower() or text.endswith("k"):
+            low = text.lower()
+            if "mile" in low or re.search(r'\d+k\b', low):
                 mileage = text
-                break
+            elif low in body_types:
+                body = text
 
         # Location: dealer name + distance
         dealer_el = await card.query_selector(".result-card__dealer")
@@ -171,4 +177,5 @@ class MotorsScraper(Scraper):
             mileage=mileage,
             location=location,
             link=link,
+            body=body,
         )

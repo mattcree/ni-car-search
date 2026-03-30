@@ -112,6 +112,7 @@ class NIVehicleSalesScraper(Scraper):
                     mileage=mileage_str,
                     location=dealer,
                     link=link,
+                    body=item.get("body_type", "-") or "-",
                 ))
 
             results.extend(page_results)
