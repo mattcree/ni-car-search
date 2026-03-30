@@ -2,13 +2,9 @@
 
 Method:
     Browser-based (Playwright + stealth). Uses opaque numeric IDs for
-    make and model, resolved dynamically:
-
-    1. Load usedcarsni.com homepage
-    2. Select make from dropdown (hardcoded make->ID map)
-    3. Wait for model dropdown to populate via JS
-    4. Read options to find model ID (e.g. Superb=1960)
-    5. Construct search URL with exact IDs
+    make and model, resolved dynamically by visiting the homepage and
+    picking from the make/model dropdowns using contains matching
+    (e.g. "mercedes" matches "Mercedes-Benz").
 
     URL: usedcarsni.com/search_results.php?make={id}&model={id}&pagepc0={n}
 
@@ -18,9 +14,8 @@ Method:
     and .euroPrice for price.
 
 Limitations:
-    - Make IDs hardcoded for ~25 common makes.
     - Cloudflare Turnstile requires stealth bypass.
-    - Model ID resolution adds ~5s (homepage + dropdown interaction).
+    - ID resolution adds ~5s (homepage + dropdown interaction).
 """
 
 from __future__ import annotations

@@ -39,14 +39,17 @@ async def run(
 
     all_listings: list[Listing] = []
     errors: dict[str, str] = {}
-    lock = asyncio.Lock()
 
     def on_page(source: str):
-        """Return a callback that emits results for a given source."""
+        """Return a callback that deduplicates across retries."""
+        seen: set[str] = set()
         def _callback(listings: list[Listing]):
-            all_listings.extend(listings)
-            if on_results:
-                on_results(source, listings)
+            new = [l for l in listings if l.link not in seen]
+            for l in new:
+                seen.add(l.link)
+            all_listings.extend(new)
+            if on_results and new:
+                on_results(source, new)
         return _callback
 
     browser_scrapers = [s for s in scrapers if s.needs_browser]

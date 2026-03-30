@@ -78,8 +78,9 @@ class Scraper(ABC):
     needs_browser: bool = True
     self_navigates: bool = False  # True if scraper handles its own page navigation
 
-    @abstractmethod
-    def build_url(self, make: str, model: str, filters: Filters) -> str: ...
+    def build_url(self, make: str, model: str, filters: Filters) -> str:
+        """Build the search URL. Not needed for self-navigating scrapers."""
+        return ""
 
     @abstractmethod
     async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
