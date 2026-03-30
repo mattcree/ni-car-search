@@ -14,6 +14,7 @@ class Listing:
     location: str
     link: str
     body: str = "-"
+    transmission: str = "-"
 
 
 NI_LOCATIONS = {

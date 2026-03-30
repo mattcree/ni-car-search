@@ -139,7 +139,15 @@ class AutoTraderScraper(Scraper):
                 body = bt.title()
                 break
 
+        # Transmission from subtitle
+        transmission = "-"
+        if "dsg" in sub_lower or "auto" in sub_lower:
+            transmission = "Automatic"
+        elif "manual" in sub_lower:
+            transmission = "Manual"
+
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
+            transmission=transmission,
         )

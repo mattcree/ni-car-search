@@ -20,6 +20,7 @@ _PRICE = 8
 _YEAR = 4
 _MILES = 14
 _BODY = 12
+_TRANS = 6
 _LOC = 22
 
 
@@ -33,7 +34,9 @@ def _parse_price(price: str) -> float:
 
 def _fmt(r: Listing, prefix: str = "") -> tuple[str, str]:
     """Return (main_line, link_line) for a listing."""
-    main = f"{prefix}{r.source:{_SRC}s} {r.price:>{_PRICE}s}  {r.year:{_YEAR}s}  {r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {r.location:{_LOC}s}  {r.title}"
+    t = r.transmission.lower()
+    trans = "Auto" if "auto" in t or "dsg" in t else ("Man" if "man" in t else ("-" if t == "-" else r.transmission[:_TRANS]))
+    main = f"{prefix}{r.source:{_SRC}s} {r.price:>{_PRICE}s}  {r.year:{_YEAR}s}  {r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {trans:{_TRANS}s}  {r.location:{_LOC}s}  {r.title}"
     link = f"{' ' * len(prefix)}{' ' * _SRC} {r.link}"
     return main, link
 
@@ -41,10 +44,12 @@ def _fmt(r: Listing, prefix: str = "") -> tuple[str, str]:
 def _fmt_rich(r: Listing, prefix: str = "", prefix_style: str = "") -> tuple[str, str]:
     """Return (main_line, link_line) with rich markup."""
     pfx = f"[{prefix_style}]{prefix}[/{prefix_style}]" if prefix_style and prefix else prefix
+    t = r.transmission.lower()
+    trans = "Auto" if "auto" in t or "dsg" in t else ("Man" if "man" in t else ("-" if t == "-" else r.transmission[:_TRANS]))
     main = (
         f"{pfx}[cyan]{r.source:{_SRC}s}[/cyan] "
         f"[green]{r.price:>{_PRICE}s}[/green]  {r.year:{_YEAR}s}  "
-        f"{r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {r.location:{_LOC}s}  {r.title}"
+        f"{r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {trans:{_TRANS}s}  {r.location:{_LOC}s}  {r.title}"
     )
     pad = " " * len(prefix)
     link = f"{pad}{' ' * _SRC} [dim]{r.link}[/dim]"

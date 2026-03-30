@@ -149,6 +149,14 @@ class GumtreeScraper(Scraper):
                     body = bt.title()
                     break
 
+        trans_el = await article.query_selector('[data-q="motors-transmission"]')
+        transmission = (await trans_el.inner_text()).strip() if trans_el else "-"
+        if transmission == "-":
+            for t in ["automatic", "semi-auto", "manual"]:
+                if t in title.lower():
+                    transmission = t.title()
+                    break
+
         if filters.min_year or filters.max_year:
             try:
                 y = int(year)
@@ -162,4 +170,5 @@ class GumtreeScraper(Scraper):
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
+            transmission=transmission,
         )

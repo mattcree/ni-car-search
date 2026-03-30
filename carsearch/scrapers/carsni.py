@@ -123,6 +123,13 @@ class CarsNIScraper(Scraper):
                 body = bt.title()
                 break
 
+        # Transmission
+        transmission = "-"
+        if "automatic" in full_lower or "dsg" in full_lower:
+            transmission = "Automatic"
+        elif "manual" in full_lower:
+            transmission = "Manual"
+
         # Apply year filters
         if filters.min_year or filters.max_year:
             try:
@@ -143,4 +150,5 @@ class CarsNIScraper(Scraper):
             location=location,
             link=link,
             body=body,
+            transmission=transmission,
         )

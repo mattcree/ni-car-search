@@ -140,8 +140,10 @@ class MotorsScraper(Scraper):
         # Typical order: engine size, mileage, fuel, transmission, body type
         mileage = "-"
         body = "-"
+        transmission = "-"
         body_types = {"hatchback", "estate", "saloon", "suv", "coupe", "convertible",
                       "mpv", "pickup", "van", "sedan", "cabriolet", "limousine"}
+        trans_types = {"auto", "automatic", "manual", "semi-auto", "semi-automatic"}
         specs = await card.query_selector_all(".result-card__vehicle-info li")
         for s in specs:
             text = (await s.inner_text()).strip().replace("\n", " ")
@@ -150,6 +152,8 @@ class MotorsScraper(Scraper):
                 mileage = text
             elif low in body_types:
                 body = text
+            elif low in trans_types:
+                transmission = text
 
         # Location: dealer name + distance
         dealer_el = await card.query_selector(".result-card__dealer")
@@ -178,4 +182,5 @@ class MotorsScraper(Scraper):
             location=location,
             link=link,
             body=body,
+            transmission=transmission,
         )

@@ -113,6 +113,7 @@ class NIVehicleSalesScraper(Scraper):
                     location=dealer,
                     link=link,
                     body=item.get("body_type", "-") or "-",
+                    transmission=item.get("transmission", "-") or "-",
                 ))
 
             results.extend(page_results)
