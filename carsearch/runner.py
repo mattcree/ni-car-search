@@ -53,10 +53,15 @@ async def run(
     request_scrapers = [s for s in scrapers if not s.needs_browser]
 
     async def run_request_scraper(scraper: Scraper):
-        try:
-            results = await scraper.scrape(None, make, model, filters, on_page=on_page(scraper.name))
-        except Exception as e:
-            errors[scraper.name] = str(e)
+        for attempt in range(3):
+            try:
+                await scraper.scrape(None, make, model, filters, on_page=on_page(scraper.name))
+                return
+            except Exception as e:
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    errors[scraper.name] = str(e)
 
     async def run_browser_scrapers():
         if not browser_scrapers:
@@ -68,21 +73,26 @@ async def run(
             browser = await p.chromium.launch(headless=True, channel="chrome")
 
             async def _scrape(scraper: Scraper):
-                page = await browser.new_page()
-                try:
-                    if scraper.self_navigates:
-                        await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
-                    else:
-                        url = scraper.build_url(make, model, filters)
-                        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                        await page.wait_for_timeout(3000)
-                        await _dismiss_cookies(page)
-                        await page.wait_for_timeout(2000)
-                        await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
-                except Exception as e:
-                    errors[scraper.name] = str(e)
-                finally:
-                    await page.close()
+                for attempt in range(3):
+                    page = await browser.new_page()
+                    try:
+                        if scraper.self_navigates:
+                            await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
+                        else:
+                            url = scraper.build_url(make, model, filters)
+                            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                            await page.wait_for_timeout(3000)
+                            await _dismiss_cookies(page)
+                            await page.wait_for_timeout(2000)
+                            await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
+                        return
+                    except Exception as e:
+                        if attempt < 2:
+                            await asyncio.sleep(2 ** attempt)
+                        else:
+                            errors[scraper.name] = str(e)
+                    finally:
+                        await page.close()
 
             await asyncio.gather(*[_scrape(s) for s in browser_scrapers])
             await browser.close()

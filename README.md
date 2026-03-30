@@ -9,7 +9,7 @@ Search 6 car listing sites simultaneously from the command line. Built for findi
 Runs headless Chrome with Playwright to scrape all sites in parallel, streaming results to your terminal as pages are scraped. Paginates through every page so nothing gets missed. Detects cross-site duplicates and tracks changes between runs.
 
 ```
-$ python -m carsearch skoda superb --location belfast --radius 80
+$ .venv/bin/python -m carsearch skoda superb --location belfast --radius 80
 
 Searching for Skoda Superb in Belfast (80 miles)...
 
@@ -44,32 +44,33 @@ Changes since 2026-03-29T21:12:28+00:00:
 Requires Python 3.10+ and Google Chrome.
 
 ```bash
-pip install requests playwright playwright-stealth rich
-playwright install chromium
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install chromium
 ```
 
 ## Usage
 
 ```bash
 # Basic search
-python -m carsearch skoda superb
+.venv/bin/python -m carsearch skoda superb
 
 # With location and radius
-python -m carsearch vw golf --location belfast --radius 80
+.venv/bin/python -m carsearch vw golf --location belfast --radius 80
 
 # With price, year, and page filters
-python -m carsearch bmw 3-series --min-price 5000 --max-price 15000 --min-year 2018
+.venv/bin/python -m carsearch bmw 3-series --min-price 5000 --max-price 15000 --min-year 2018
 
 # Limit pages per site for faster results
-python -m carsearch ford focus --max-pages 2
+.venv/bin/python -m carsearch ford focus --max-pages 2
 
 # Skip snapshot save/compare
-python -m carsearch skoda kodiaq --no-snapshot
+.venv/bin/python -m carsearch skoda kodiaq --no-snapshot
 
 # Common aliases work
-python -m carsearch merc c-class    # Mercedes-Benz
-python -m carsearch beemer 3-series # BMW
-python -m carsearch landy discovery # Land Rover
+.venv/bin/python -m carsearch merc c-class    # Mercedes-Benz
+.venv/bin/python -m carsearch beemer 3-series # BMW
+.venv/bin/python -m carsearch landy discovery # Land Rover
 ```
 
 ### Options
