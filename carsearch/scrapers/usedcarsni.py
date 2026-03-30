@@ -30,44 +30,16 @@ from urllib.parse import urlencode
 
 from ..base import Filters, Listing, Scraper
 
-MAKE_IDS = {
-    "audi": 1,
-    "bmw": 2,
-    "citroen": 4,
-    "fiat": 6,
-    "ford": 7,
-    "honda": 8,
-    "hyundai": 9,
-    "jaguar": 11,
-    "kia": 13,
-    "land rover": 14,
-    "mazda": 15,
-    "mercedes-benz": 16,
-    "mg": 17,
-    "mini": 18,
-    "nissan": 20,
-    "peugeot": 22,
-    "renault": 24,
-    "seat": 27,
-    "skoda": 28,
-    "toyota": 30,
-    "vauxhall": 31,
-    "volkswagen": 32,
-    "volvo": 33,
-    "dacia": 793,
-}
-
-
 class UsedCarsNIScraper(Scraper):
     name = "UsedCarsNI"
     needs_browser = True
     self_navigates = True
 
     def build_url(self, make: str, model: str, filters: Filters) -> str:
-        make_id = MAKE_IDS.get(make.lower(), 0)
-        return f"https://www.usedcarsni.com/search_results.php?search_type=1&make={make_id}&model=0&keywords={model}"
+        return f"https://www.usedcarsni.com/search_results.php?search_type=1&make=0&model=0&keywords={make}+{model}"
 
-    async def _resolve_model_id(self, page, make: str, model: str) -> str | None:
+    async def _resolve_ids(self, page, make: str, model: str) -> tuple[str, str] | None:
+        """Pick make and model from dropdowns using contains matching."""
         await page.goto("https://www.usedcarsni.com", wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(3000)
 
@@ -78,33 +50,50 @@ class UsedCarsNIScraper(Scraper):
                 await page.wait_for_timeout(1000)
                 break
 
-        make_id = str(MAKE_IDS.get(make.lower(), 0))
-        if make_id == "0":
-            return None
-
+        # Find make by contains match on dropdown options
         make_select = await page.query_selector('select[name="make"]')
         if not make_select:
+            return None
+
+        make_id = None
+        make_options = await make_select.query_selector_all("option")
+        target_make = make.lower()
+        for opt in make_options:
+            text = (await opt.inner_text()).strip()
+            val = await opt.get_attribute("value") or "0"
+            name = re.sub(r"\s*\(\d+\)\s*$", "", text).strip().lower()
+            if val != "0" and target_make in name:
+                make_id = val
+                break
+
+        if not make_id:
             return None
 
         await make_select.select_option(value=make_id)
         await page.wait_for_timeout(2000)
 
+        # Find model by contains match on dropdown options
         model_select = await page.query_selector('select[name="model"]')
         if not model_select:
             return None
 
-        options = await model_select.query_selector_all("option")
-        target = model.lower()
-        for opt in options:
+        model_id = None
+        model_options = await model_select.query_selector_all("option")
+        target_model = model.lower()
+        for opt in model_options:
             text = (await opt.inner_text()).strip()
             val = await opt.get_attribute("value") or "0"
             name = re.sub(r"\s*\(\d+\)\s*$", "", text).strip().lower()
-            if name == target:
-                return val
+            if val != "0" and target_model in name:
+                model_id = val
+                break
 
-        return None
+        if not model_id:
+            return None
 
-    def _build_results_url(self, make_id: int, model_id: str, filters: Filters, page: int = 1) -> str:
+        return make_id, model_id
+
+    def _build_results_url(self, make_id: str, model_id: str, filters: Filters, page: int = 1) -> str:
         params = {
             "search_type": 1,
             "make": make_id,
@@ -128,11 +117,11 @@ class UsedCarsNIScraper(Scraper):
         return f"https://www.usedcarsni.com/search_results.php?{urlencode(params)}"
 
     async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
-        model_id = await self._resolve_model_id(page, make, model)
-        if not model_id:
-            raise ValueError(f"Could not find model '{model}' for make '{make}' on UsedCarsNI")
+        ids = await self._resolve_ids(page, make, model)
+        if not ids:
+            raise ValueError(f"Could not find '{make} {model}' on UsedCarsNI")
 
-        make_id = MAKE_IDS.get(make.lower(), 0)
+        make_id, model_id = ids
         results = []
         page_num = 1
         seen_links: set[str] = set()

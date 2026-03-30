@@ -66,23 +66,6 @@ class Filters:
     max_pages: int = 0  # 0 = no limit
 
 
-MAKE_ALIASES = {
-    "vw": "Volkswagen",
-    "merc": "Mercedes-Benz",
-    "mercedes": "Mercedes-Benz",
-    "beemer": "BMW",
-    "landy": "Land Rover",
-    "land rover": "Land Rover",
-    "landrover": "Land Rover",
-    "jag": "Jaguar",
-    "mini": "MINI",
-    "alfa": "Alfa Romeo",
-}
-
-
-def resolve_make(make: str) -> str:
-    return MAKE_ALIASES.get(make.lower(), make.title())
-
 
 class Scraper(ABC):
     """Base class for all site scrapers.

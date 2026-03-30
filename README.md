@@ -67,10 +67,9 @@ python3 -m venv .venv
 # Skip snapshot save/compare
 .venv/bin/python -m carsearch skoda kodiaq --no-snapshot
 
-# Common aliases work
-.venv/bin/python -m carsearch merc c-class    # Mercedes-Benz
-.venv/bin/python -m carsearch beemer 3-series # BMW
-.venv/bin/python -m carsearch landy discovery # Land Rover
+# Partial names work (contains matching)
+.venv/bin/python -m carsearch mercedes c-class  # matches Mercedes-Benz
+.venv/bin/python -m carsearch land rover discovery
 ```
 
 ### Options

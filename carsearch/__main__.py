@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 
-from .base import Filters, resolve_location, resolve_make
+from .base import Filters, resolve_location
 from .dedup import find_duplicates
 from .display import display_diff, display_duplicates, display_errors, display_summary, emit
 from .runner import run
@@ -26,8 +26,8 @@ def main():
     parser.add_argument("--no-snapshot", action="store_true", help="Don't save or compare snapshots")
     args = parser.parse_args()
 
-    make = resolve_make(args.make)
-    model = args.model.title()
+    make = args.make
+    model = args.model
 
     location = args.location
     postcode = resolve_location(location)
