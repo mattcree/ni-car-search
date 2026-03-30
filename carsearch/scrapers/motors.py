@@ -39,33 +39,42 @@ class MotorsScraper(Scraper):
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(5000)
 
-        # Dismiss cookies
-        for sel in ['button:has-text("Accept All")', '#onetrust-accept-btn-handler']:
-            btn = await page.query_selector(sel)
-            if btn and await btn.is_visible():
-                await btn.click()
-                await page.wait_for_timeout(1000)
-                break
-
-        # Set distance filter and resubmit
+        # Dismiss cookies + modals, set distance - all via JS to avoid overlay issues
         if filters.radius:
-            # Pick the nearest available option: 1, 10, 20, 30, 40, 50, 60, 100, 200, 1000
             options = [1, 10, 20, 30, 40, 50, 60, 100, 200, 1000]
-            best = str(min(options, key=lambda x: abs(x - filters.radius) if x >= filters.radius else 9999))
-            dist_sel = await page.query_selector("select#Distance")
-            if dist_sel:
-                await dist_sel.select_option(value=best)
-                await page.wait_for_timeout(500)
-                search_btn = await page.query_selector('button:has-text("Search")')
-                if search_btn:
-                    await search_btn.click()
-                    await page.wait_for_timeout(5000)
+            best = min(options, key=lambda x: abs(x - filters.radius) if x >= filters.radius else 9999)
+        else:
+            best = 1000
+
+        await page.evaluate(f"""(dist) => {{
+            // Remove overlays
+            document.querySelectorAll('.radix_modal__overlay, [data-state="open"]')
+                .forEach(el => el.remove());
+            // Accept cookies
+            const cb = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Accept All'));
+            if (cb) cb.click();
+            // Set distance
+            const sel = document.getElementById('Distance');
+            if (sel) {{ sel.value = String(dist); sel.dispatchEvent(new Event('change', {{bubbles: true}})); }}
+            // Submit
+            setTimeout(() => {{
+                const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Search');
+                if (btn) btn.click();
+            }}, 500);
+        }}""", best)
+        await page.wait_for_timeout(5000)
 
         results = []
         seen_links: set[str] = set()
         page_num = 1
 
         while True:
+            # Remove any modal overlays blocking the page
+            await page.evaluate("""() => {
+                document.querySelectorAll('.radix_modal__overlay, [data-state="open"]')
+                    .forEach(el => el.remove());
+            }""")
+
             try:
                 await page.wait_for_selector(".result-card", timeout=5000)
             except Exception:
@@ -89,12 +98,14 @@ class MotorsScraper(Scraper):
             if on_page:
                 on_page(page_results)
 
-            # Check for next page button
-            next_btn = await page.query_selector("button.pgn__next:not([disabled])")
-            if not next_btn or (filters.max_pages and page_num >= filters.max_pages):
+            # Paginate via JS click (Playwright clicks are blocked by overlays)
+            has_next = await page.evaluate("""() => {
+                const btn = document.querySelector('button.pgn__next:not([disabled])');
+                if (btn) { btn.click(); return true; }
+                return false;
+            }""")
+            if not has_next or (filters.max_pages and page_num >= filters.max_pages):
                 break
-
-            await next_btn.click()
             await page.wait_for_timeout(3000)
             page_num += 1
 
