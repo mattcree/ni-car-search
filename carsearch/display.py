@@ -1,27 +1,22 @@
 from __future__ import annotations
 
+import json
 import re
 import sys
+from dataclasses import asdict
 
 from .base import Listing
 
 try:
     from rich.console import Console
+    from rich.table import Table
+    from rich import box
 
     RICH = True
 except ImportError:
     RICH = False
 
-_console = Console() if RICH else None
-
-# Standard column widths
-_SRC = 14
-_PRICE = 8
-_YEAR = 4
-_MILES = 14
-_BODY = 12
-_TRANS = 6
-_LOC = 22
+_console = Console(width=max(160, Console().width)) if RICH else None
 
 
 def _parse_price(price: str) -> float:
@@ -32,61 +27,115 @@ def _parse_price(price: str) -> float:
         return float("inf")
 
 
-def _fmt(r: Listing, prefix: str = "") -> tuple[str, str]:
-    """Return (main_line, link_line) for a listing."""
-    t = r.transmission.lower()
-    trans = "Auto" if "auto" in t or "dsg" in t else ("Man" if "man" in t else ("-" if t == "-" else r.transmission[:_TRANS]))
-    main = f"{prefix}{r.source:{_SRC}s} {r.price:>{_PRICE}s}  {r.year:{_YEAR}s}  {r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {trans:{_TRANS}s}  {r.location:{_LOC}s}  {r.title}"
-    link = f"{' ' * len(prefix)}{' ' * _SRC} {r.link}"
-    return main, link
+def _trans(t: str) -> str:
+    t = t.lower()
+    if "auto" in t or "dsg" in t:
+        return "Auto"
+    if "man" in t:
+        return "Man"
+    return "-" if t == "-" else t
 
 
-def _fmt_rich(r: Listing, prefix: str = "", prefix_style: str = "") -> tuple[str, str]:
-    """Return (main_line, link_line) with rich markup."""
-    pfx = f"[{prefix_style}]{prefix}[/{prefix_style}]" if prefix_style and prefix else prefix
-    t = r.transmission.lower()
-    trans = "Auto" if "auto" in t or "dsg" in t else ("Man" if "man" in t else ("-" if t == "-" else r.transmission[:_TRANS]))
-    main = (
-        f"{pfx}[cyan]{r.source:{_SRC}s}[/cyan] "
-        f"[green]{r.price:>{_PRICE}s}[/green]  {r.year:{_YEAR}s}  "
-        f"{r.mileage:>{_MILES}s}  {r.body:{_BODY}s}  {trans:{_TRANS}s}  {r.location:{_LOC}s}  {r.title}"
+def _title_with_link(r: Listing) -> str:
+    """Title as a clickable hyperlink in Rich, or title + link for plain text."""
+    if RICH and r.link != "-":
+        return f"[link={r.link}]{r.title}[/link]"
+    return r.title
+
+
+def _make_table(title: str = "") -> Table:
+    table = Table(
+        title=title,
+        box=box.SIMPLE_HEAD,
+        show_edge=False,
+        pad_edge=False,
+        title_style="bold",
     )
-    pad = " " * len(prefix)
-    link = f"{pad}{' ' * _SRC} [dim]{r.link}[/dim]"
-    return main, link
+    table.add_column("Source", style="cyan", no_wrap=True, min_width=14)
+    table.add_column("Price", style="green bold", justify="right", no_wrap=True, min_width=8)
+    table.add_column("Year", no_wrap=True, min_width=4)
+    table.add_column("Mileage", justify="right", no_wrap=True, min_width=14)
+    table.add_column("Trans", no_wrap=True, min_width=5)
+    table.add_column("Location", no_wrap=True, max_width=26, overflow="ellipsis")
+    table.add_column("Title", no_wrap=True, overflow="ellipsis")
+    return table
 
 
-def _print_listing(r: Listing, prefix: str = "", prefix_style: str = ""):
-    if RICH:
-        main, link = _fmt_rich(r, prefix, prefix_style)
-        _console.print(main)
-        _console.print(link)
-    else:
-        main, link = _fmt(r, prefix)
-        print(main)
-        print(link)
+def _add_row(table: Table, r: Listing, style: str | None = None):
+    table.add_row(
+        r.source, r.price, r.year, r.mileage,
+        _trans(r.transmission),
+        r.location,
+        _title_with_link(r),
+        style=style,
+    )
 
 
-def emit(source: str, listings: list[Listing]):
-    """Print a batch of results as they arrive from a scraper."""
+def _plain_row(r: Listing, prefix: str = "") -> str:
+    t = _trans(r.transmission)
+    return (
+        f"{prefix}{r.source:<14} {r.price:>8}  {r.year:<4}  {r.mileage:>14}  "
+        f"{t:<6}  {r.location:<24}  {r.title}\n"
+        f"{prefix}{' ' * 14} {r.link}"
+    )
+
+
+# --- Streaming mode (per-source as they arrive) ---
+
+def emit_stream(source: str, listings: list[Listing]):
     if not listings:
         return
-
     listings.sort(key=lambda r: _parse_price(r.price))
+    if RICH:
+        table = _make_table(f"{source}: {len(listings)} listings")
+        for r in listings:
+            _add_row(table, r)
+        _console.print(table)
+        _console.print()
+    else:
+        print(f"  {source}: {len(listings)} listings")
+        for r in listings:
+            print(_plain_row(r, prefix="    "))
+        print()
 
+
+def emit_progress(source: str, listings: list[Listing]):
+    """Just show a count — used in collect mode."""
+    if not listings:
+        return
     if RICH:
         _console.print(f"  [cyan]{source}[/cyan]: [bold]{len(listings)}[/bold] listings")
     else:
         print(f"  {source}: {len(listings)} listings")
 
-    for r in listings:
-        _print_listing(r, prefix="    ")
 
+# --- Collected mode (combined sorted table at end) ---
+
+def display_table(listings: list[Listing]):
+    if not listings:
+        return
+    sorted_listings = sorted(listings, key=lambda r: _parse_price(r.price))
     if RICH:
+        table = _make_table()
+        for r in sorted_listings:
+            _add_row(table, r)
         _console.print()
+        _console.print(table)
     else:
         print()
+        for r in sorted_listings:
+            print(_plain_row(r))
 
+
+# --- JSON mode ---
+
+def display_json(listings: list[Listing]):
+    sorted_listings = sorted(listings, key=lambda r: _parse_price(r.price))
+    data = [asdict(r) for r in sorted_listings]
+    print(json.dumps(data, indent=2))
+
+
+# --- Shared display functions ---
 
 def display_errors(errors: dict[str, str]):
     if not errors:
@@ -117,16 +166,18 @@ def display_duplicates(clusters: list[list]):
 
     if RICH:
         _console.print(f"\n[bold yellow]Probable duplicates ({len(clusters)} cars on multiple sites):[/bold yellow]")
+        for i, cluster in enumerate(clusters, 1):
+            table = _make_table(f"#{i}")
+            table.title_style = "yellow"
+            for r in cluster:
+                _add_row(table, r)
+            _console.print(table)
     else:
         print(f"\nProbable duplicates ({len(clusters)} cars on multiple sites):")
-
-    for i, cluster in enumerate(clusters, 1):
-        if RICH:
-            _console.print(f"\n  [yellow]#{i}[/yellow]")
-        else:
+        for i, cluster in enumerate(clusters, 1):
             print(f"\n  #{i}")
-        for r in cluster:
-            _print_listing(r, prefix="    ")
+            for r in cluster:
+                print(_plain_row(r, prefix="    "))
 
 
 def display_diff(diff_result: dict, prev_timestamp: str):
@@ -149,34 +200,48 @@ def display_diff(diff_result: dict, prev_timestamp: str):
 
     if new:
         if RICH:
-            _console.print(f"\n  [green bold]+ New ({len(new)}):[/green bold]")
+            table = _make_table(f"+ New ({len(new)})")
+            table.title_style = "green bold"
+            for r in sorted(new, key=lambda r: _parse_price(r.price)):
+                _add_row(table, r, style="green")
+            _console.print(table)
         else:
             print(f"\n  + New ({len(new)}):")
-        for r in sorted(new, key=lambda r: _parse_price(r.price)):
-            _print_listing(r, prefix="  + ", prefix_style="green")
+            for r in sorted(new, key=lambda r: _parse_price(r.price)):
+                print(_plain_row(r, prefix="  + "))
 
     if gone:
         if RICH:
-            _console.print(f"\n  [red bold]- Gone ({len(gone)}):[/red bold]")
+            table = _make_table(f"- Gone ({len(gone)})")
+            table.title_style = "red bold"
+            for r in sorted(gone, key=lambda r: _parse_price(r.price)):
+                _add_row(table, r, style="red")
+            _console.print(table)
         else:
             print(f"\n  - Gone ({len(gone)}):")
-        for r in sorted(gone, key=lambda r: _parse_price(r.price)):
-            _print_listing(r, prefix="  - ", prefix_style="red")
+            for r in sorted(gone, key=lambda r: _parse_price(r.price)):
+                print(_plain_row(r, prefix="  - "))
 
     if price_changed:
         if RICH:
-            _console.print(f"\n  [yellow bold]~ Price changed ({len(price_changed)}):[/yellow bold]")
+            table = _make_table(f"~ Price changed ({len(price_changed)})")
+            table.title_style = "yellow bold"
+            for r, old_price in sorted(price_changed, key=lambda x: _parse_price(x[0].price)):
+                changed = Listing(
+                    source=r.source,
+                    title=f"{old_price} -> {r.price}  {r.title}",
+                    price=r.price, year=r.year, mileage=r.mileage,
+                    location=r.location, link=r.link,
+                )
+                _add_row(table, changed, style="yellow")
+            _console.print(table)
         else:
             print(f"\n  ~ Price changed ({len(price_changed)}):")
-        for r, old_price in sorted(price_changed, key=lambda x: _parse_price(x[0].price)):
-            # Swap title to show price change
-            changed = Listing(
-                source=r.source,
-                title=f"{old_price} -> {r.price}  {r.title}",
-                price=r.price,
-                year=r.year,
-                mileage=r.mileage,
-                location=r.location,
-                link=r.link,
-            )
-            _print_listing(changed, prefix="  ~ ", prefix_style="yellow")
+            for r, old_price in sorted(price_changed, key=lambda x: _parse_price(x[0].price)):
+                changed = Listing(
+                    source=r.source,
+                    title=f"{old_price} -> {r.price}  {r.title}",
+                    price=r.price, year=r.year, mileage=r.mileage,
+                    location=r.location, link=r.link,
+                )
+                print(_plain_row(changed, prefix="  ~ "))

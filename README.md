@@ -1,8 +1,8 @@
 # NI Car Search
 
-Search 6 car listing sites simultaneously from the command line. Built for finding cars in Northern Ireland.
+Search 5 car listing sites simultaneously from the command line. Built for finding cars in Northern Ireland.
 
-**Sites scraped:** UsedCarsNI, AutoTrader, Motors.co.uk, Gumtree, Cars.ni, NI Vehicle Sales
+**Sites scraped:** UsedCarsNI, AutoTrader, Motors.co.uk, Gumtree, NI Vehicle Sales
 
 ## What it does
 
@@ -84,6 +84,8 @@ python3 -m venv .venv
 | `--max-year` | Maximum year |
 | `--max-pages` | Max pages to scrape per site (default: no limit) |
 | `--no-snapshot` | Don't save or compare snapshots |
+| `--json` | Output results as JSON |
+| `--stream` | Show results per-source as they arrive (default: collect and sort) |
 
 ### Locations
 
@@ -131,10 +133,6 @@ Part of the MOTORS network (same as Gumtree, Cazoo, eBay Motors). Session-based 
 Uses structured `vehicle_make` and `vehicle_model` URL params. Only collects local results, excluding the "Results from outside your search" section.
 
 Pagination via `&page=N`. Stops when the forward-page button disappears.
-
-### Cars.ni
-
-NI-specific WordPress site. Cloudflare requires stealth browser. URL-based make/model filtering with standard pagination.
 
 ### NI Vehicle Sales
 
