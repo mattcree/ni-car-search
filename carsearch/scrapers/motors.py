@@ -47,6 +47,20 @@ class MotorsScraper(Scraper):
                 await page.wait_for_timeout(1000)
                 break
 
+        # Set distance filter and resubmit
+        if filters.radius:
+            # Pick the nearest available option: 1, 10, 20, 30, 40, 50, 60, 100, 200, 1000
+            options = [1, 10, 20, 30, 40, 50, 60, 100, 200, 1000]
+            best = str(min(options, key=lambda x: abs(x - filters.radius) if x >= filters.radius else 9999))
+            dist_sel = await page.query_selector("select#Distance")
+            if dist_sel:
+                await dist_sel.select_option(value=best)
+                await page.wait_for_timeout(500)
+                search_btn = await page.query_selector('button:has-text("Search")')
+                if search_btn:
+                    await search_btn.click()
+                    await page.wait_for_timeout(5000)
+
         results = []
         seen_links: set[str] = set()
         page_num = 1
