@@ -10,6 +10,7 @@ from .base import Listing
 try:
     from rich.console import Console
     from rich.table import Table
+    from rich.text import Text
     from rich import box
 
     RICH = True
@@ -36,10 +37,12 @@ def _trans(t: str) -> str:
     return "-" if t == "-" else t
 
 
-def _title_with_link(r: Listing) -> str:
+def _title_with_link(r: Listing) -> str | Text:
     """Title as a clickable hyperlink in Rich, or title + link for plain text."""
     if RICH and r.link != "-":
-        return f"[link={r.link}]{r.title}[/link]"
+        text = Text(r.title)
+        text.stylize(f"link {r.link}")
+        return text
     return r.title
 
 
