@@ -14,7 +14,7 @@ Method:
 
 Limitations:
     - Session-based: search params live in a cookie, not the URL.
-    - ~22 results per page.
+    - ~22 results per page (PAGE_SIZE).
 """
 
 from __future__ import annotations
@@ -23,6 +23,9 @@ import re
 from urllib.parse import urlencode
 
 from ..base import Filters, Listing, Scraper
+
+
+PAGE_SIZE = 22
 
 
 class MotorsScraper(Scraper):
@@ -97,6 +100,9 @@ class MotorsScraper(Scraper):
             results.extend(page_results)
             if on_page:
                 on_page(page_results)
+
+            if len(cards) < PAGE_SIZE:
+                break
 
             # Paginate via JS click (Playwright clicks are blocked by overlays)
             has_next = await page.evaluate("""() => {
