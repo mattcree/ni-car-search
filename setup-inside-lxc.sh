@@ -21,7 +21,7 @@ venv/bin/playwright install chromium
 mkdir -p /root/.carsearch
 
 echo "=== Creating systemd service ==="
-cat > /etc/systemd/system/carsearch.service << 'UNIT'
+cat > /etc/systemd/system/carsearch.service << UNIT
 [Unit]
 Description=CarSearch Web App
 After=network.target
