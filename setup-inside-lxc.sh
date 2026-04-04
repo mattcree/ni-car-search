@@ -2,6 +2,11 @@
 set -euo pipefail
 
 PORT="${PORT:-8000}"
+export DEBIAN_FRONTEND=noninteractive
+
+echo "=== Installing system packages ==="
+apt-get update -qq
+apt-get install -y -qq python3 python3-pip python3-venv git wget gnupg2 curl
 
 echo "=== Installing Chrome ==="
 wget -q -O /tmp/google.pub https://dl.google.com/linux/linux_signing_key.pub
