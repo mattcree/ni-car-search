@@ -1043,12 +1043,21 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { closeModal(); closePanel(); }
 });
 
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+}
+
+// Close sidebar on navigation (mobile)
+function closeSidebarOnMobile() {
+  document.getElementById("sidebar").classList.remove("open");
+}
+
 function goHome() {
   location.hash = "#feed";
 }
 
 function navigate(hash) {
-  // Parse hash and route to the right view
+  closeSidebarOnMobile();
   hash = hash || "#feed";
   if (hash === "#feed" || hash === "#" || hash === "") {
     currentWatchId = null;
