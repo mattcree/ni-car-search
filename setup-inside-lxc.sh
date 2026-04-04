@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+PORT="${PORT:-8000}"
+
 echo "=== Installing Chrome ==="
 wget -q -O /tmp/google.pub https://dl.google.com/linux/linux_signing_key.pub
 gpg --dearmor -o /usr/share/keyrings/google.gpg /tmp/google.pub
@@ -31,7 +33,7 @@ ExecStart=/opt/carsearch/venv/bin/python -m web
 Restart=always
 RestartSec=5
 Environment=CARSEARCH_HOST=0.0.0.0
-Environment=CARSEARCH_PORT=8000
+Environment=CARSEARCH_PORT=${PORT}
 
 [Install]
 WantedBy=multi-user.target
@@ -58,4 +60,4 @@ chmod +x /usr/local/bin/carsearch-update
 echo ""
 echo "=== Done ==="
 IP=$(hostname -I | awk '{print $1}')
-echo "  URL: http://${IP}:8000"
+echo "  URL: http://${IP}:${PORT}"

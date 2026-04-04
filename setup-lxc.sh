@@ -71,13 +71,13 @@ sleep 5
 echo "Installing inside container..."
 pct exec "$CTID" -- apt-get update -qq
 pct exec "$CTID" -- apt-get install -y -qq curl
-pct exec "$CTID" -- bash -c "curl -sL $INNER_SCRIPT | bash"
+pct exec "$CTID" -- bash -c "curl -sL $INNER_SCRIPT | PORT=${PORT:-8000} bash"
 
 # ── Done ────────────────────────────────────────────────────────────────────
 IP=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
 echo ""
 echo "=== CarSearch is running ==="
-echo "  URL:      http://${IP}:8000"
+echo "  URL:      http://${IP}:${PORT:-8000}"
 echo "  SSH:      ssh root@${IP}  (password: ${PASSWORD})"
 echo "  LXC:      pct enter $CTID"
 echo "  Logs:     pct exec $CTID -- journalctl -u carsearch -f"
