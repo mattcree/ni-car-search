@@ -5,49 +5,37 @@
 # Run this on your Proxmox host:
 #   bash <(curl -sL https://raw.githubusercontent.com/mattcree/ni-car-search/main/setup-lxc.sh)
 #
-# Or copy-paste the whole thing into a shell.
-#
-# What it does:
-#   1. Creates a Debian 12 LXC container
-#   2. Installs Python, Chrome, git
-#   3. Clones the repo
-#   4. Sets up a systemd service on port 8000
-#   5. Starts it
-#
-# To update later, SSH into the container and run:
-#   carsearch-update
+# To update later:
+#   pct exec 200 -- carsearch-update
 #
 
 set -euo pipefail
 
 # ── Configuration ───────────────────────────────────────────────────────────
-CTID="${CTID:-200}"                      # Container ID (change if 200 is taken)
+CTID="${CTID:-200}"
 HOSTNAME="carsearch"
-STORAGE="${STORAGE:-local-lvm}"          # Proxmox storage (local-lvm, local-zfs, etc.)
-TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"  # Where templates are stored
-MEMORY=2048                              # MB
+STORAGE="${STORAGE:-local-lvm}"
+TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
+PASSWORD="${PASSWORD:-carsearch}"
+MEMORY=2048
 SWAP=512
-DISK=8                                   # GB
+DISK=8
 CORES=2
 BRIDGE="vmbr0"
-REPO="https://github.com/mattcree/ni-car-search.git"
-PORT=8000
+INNER_SCRIPT="https://raw.githubusercontent.com/mattcree/ni-car-search/main/setup-inside-lxc.sh"
 
 echo "=== CarSearch LXC Setup ==="
 echo "  Container ID: $CTID"
 echo "  Storage: $STORAGE"
-echo "  Template storage: $TEMPLATE_STORAGE"
 echo ""
 
 # ── Download template if needed ─────────────────────────────────────────────
 if ! pveam list "$TEMPLATE_STORAGE" | grep -q "debian-12"; then
     echo "Downloading Debian 12 template..."
     pveam update
-    # Find the latest available debian-12 template
     TEMPLATE=$(pveam available --section system | grep "debian-12-standard" | tail -1 | awk '{print $2}')
     if [ -z "$TEMPLATE" ]; then
-        echo "ERROR: No Debian 12 template found. Available templates:"
-        pveam available --section system | grep debian
+        echo "ERROR: No Debian 12 template found."
         exit 1
     fi
     echo "  Using template: $TEMPLATE"
@@ -55,14 +43,12 @@ if ! pveam list "$TEMPLATE_STORAGE" | grep -q "debian-12"; then
 fi
 TEMPLATE_PATH=$(pveam list "$TEMPLATE_STORAGE" | grep "debian-12" | head -1 | awk '{print $1}')
 if [ -z "$TEMPLATE_PATH" ]; then
-    echo "ERROR: Template download failed. Check storage '$TEMPLATE_STORAGE'."
+    echo "ERROR: Template not found."
     exit 1
 fi
-echo "  Template: $TEMPLATE_PATH"
 
 # ── Create container ────────────────────────────────────────────────────────
-PASSWORD="${PASSWORD:-carsearch}"
-echo "Creating LXC container $CTID (root password: $PASSWORD)..."
+echo "Creating LXC container $CTID..."
 pct create "$CTID" "$TEMPLATE_PATH" \
     --password "$PASSWORD" \
     --hostname "$HOSTNAME" \
@@ -76,86 +62,22 @@ pct create "$CTID" "$TEMPLATE_PATH" \
     --unprivileged 1 \
     --start 0
 
-# ── Start and configure ────────────────────────────────────────────────────
+# ── Start container ─────────────────────────────────────────────────────────
 echo "Starting container..."
 pct start "$CTID"
-sleep 5  # Wait for network
+sleep 5
 
-echo "Installing dependencies inside container..."
-pct exec "$CTID" -- bash -c '
-set -euo pipefail
-
-export DEBIAN_FRONTEND=noninteractive
-
-# System packages
-apt-get update -qq
-apt-get install -y -qq \
-    python3 python3-pip python3-venv \
-    git wget gnupg2 curl \
-    > /dev/null 2>&1
-
-# Google Chrome (for Playwright)
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-    > /etc/apt/sources.list.d/google-chrome.list
-apt-get update -qq
-apt-get install -y -qq google-chrome-stable > /dev/null 2>&1
-
-# Clone repo
-git clone '"$REPO"' /opt/carsearch
-cd /opt/carsearch
-
-# Python venv + deps
-python3 -m venv /opt/carsearch/venv
-/opt/carsearch/venv/bin/pip install --quiet -e .
-/opt/carsearch/venv/bin/playwright install chromium
-
-# Data directory
-mkdir -p /root/.carsearch
-
-# ── Systemd service ─────────────────────────────────────────────────────
-cat > /etc/systemd/system/carsearch.service << UNIT
-[Unit]
-Description=CarSearch Web App
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/carsearch
-ExecStart=/opt/carsearch/venv/bin/python -m web
-Restart=always
-RestartSec=5
-Environment=CARSEARCH_HOST=0.0.0.0
-Environment=CARSEARCH_PORT='"$PORT"'
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-systemctl daemon-reload
-systemctl enable carsearch
-systemctl start carsearch
-
-# ── Update script ───────────────────────────────────────────────────────
-cat > /usr/local/bin/carsearch-update << UPDATE
-#!/usr/bin/env bash
-set -euo pipefail
-echo "Updating CarSearch..."
-cd /opt/carsearch
-git pull --ff-only
-/opt/carsearch/venv/bin/pip install --quiet -e .
-systemctl restart carsearch
-echo "Done. Service restarted."
-systemctl status carsearch --no-pager
-UPDATE
-chmod +x /usr/local/bin/carsearch-update
-'
+# ── Install curl inside, then download and run the inner setup script ───────
+echo "Installing inside container..."
+pct exec "$CTID" -- apt-get update -qq
+pct exec "$CTID" -- apt-get install -y -qq curl
+pct exec "$CTID" -- bash -c "curl -sL $INNER_SCRIPT | bash"
 
 # ── Done ────────────────────────────────────────────────────────────────────
 IP=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
 echo ""
 echo "=== CarSearch is running ==="
-echo "  URL:      http://${IP}:${PORT}"
+echo "  URL:      http://${IP}:8000"
 echo "  SSH:      ssh root@${IP}  (password: ${PASSWORD})"
 echo "  LXC:      pct enter $CTID"
 echo "  Logs:     pct exec $CTID -- journalctl -u carsearch -f"
