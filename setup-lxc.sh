@@ -61,8 +61,10 @@ fi
 echo "  Template: $TEMPLATE_PATH"
 
 # ── Create container ────────────────────────────────────────────────────────
-echo "Creating LXC container $CTID..."
+PASSWORD="${PASSWORD:-carsearch}"
+echo "Creating LXC container $CTID (root password: $PASSWORD)..."
 pct create "$CTID" "$TEMPLATE_PATH" \
+    --password "$PASSWORD" \
     --hostname "$HOSTNAME" \
     --storage "$STORAGE" \
     --rootfs "$STORAGE:$DISK" \
@@ -153,8 +155,9 @@ chmod +x /usr/local/bin/carsearch-update
 IP=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
 echo ""
 echo "=== CarSearch is running ==="
-echo "  URL:    http://${IP}:${PORT}"
-echo "  LXC:    pct enter $CTID"
-echo "  Logs:   pct exec $CTID -- journalctl -u carsearch -f"
-echo "  Update: pct exec $CTID -- carsearch-update"
+echo "  URL:      http://${IP}:${PORT}"
+echo "  SSH:      ssh root@${IP}  (password: ${PASSWORD})"
+echo "  LXC:      pct enter $CTID"
+echo "  Logs:     pct exec $CTID -- journalctl -u carsearch -f"
+echo "  Update:   pct exec $CTID -- carsearch-update"
 echo ""
