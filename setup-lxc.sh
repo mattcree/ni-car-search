@@ -40,13 +40,25 @@ echo "  Template storage: $TEMPLATE_STORAGE"
 echo ""
 
 # ── Download template if needed ─────────────────────────────────────────────
-TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
 if ! pveam list "$TEMPLATE_STORAGE" | grep -q "debian-12"; then
     echo "Downloading Debian 12 template..."
     pveam update
+    # Find the latest available debian-12 template
+    TEMPLATE=$(pveam available --section system | grep "debian-12-standard" | tail -1 | awk '{print $2}')
+    if [ -z "$TEMPLATE" ]; then
+        echo "ERROR: No Debian 12 template found. Available templates:"
+        pveam available --section system | grep debian
+        exit 1
+    fi
+    echo "  Using template: $TEMPLATE"
     pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
 fi
 TEMPLATE_PATH=$(pveam list "$TEMPLATE_STORAGE" | grep "debian-12" | head -1 | awk '{print $1}')
+if [ -z "$TEMPLATE_PATH" ]; then
+    echo "ERROR: Template download failed. Check storage '$TEMPLATE_STORAGE'."
+    exit 1
+fi
+echo "  Template: $TEMPLATE_PATH"
 
 # ── Create container ────────────────────────────────────────────────────────
 echo "Creating LXC container $CTID..."
