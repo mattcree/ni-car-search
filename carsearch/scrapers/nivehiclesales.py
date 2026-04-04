@@ -44,11 +44,18 @@ class NIVehicleSalesScraper(Scraper):
     def build_url(self, make: str, model: str, filters: Filters) -> str:
         return f"https://nivehiclesales.com/?make={make}&model={model}"
 
-    async def scrape(self, _page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
+    async def scrape(self, _page, make: str, model: str, filters: Filters, on_page=None, source_params=None) -> list[Listing]:
+        # Use exact match from catalogue when available, fuzzy otherwise
+        if source_params:
+            make_filter = f"eq.{source_params.make}"
+            model_filter = f"ilike.*{source_params.model}*"
+        else:
+            make_filter = f"ilike.*{make}*"
+            model_filter = f"ilike.*{model}*"
         params = {
             "select": "*",
-            "make": f"ilike.*{make}*",
-            "model": f"ilike.*{model}*",
+            "make": make_filter,
+            "model": model_filter,
             "order": "price.asc",
             "limit": PAGE_SIZE,
             "offset": 0,

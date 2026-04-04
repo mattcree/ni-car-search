@@ -5,6 +5,19 @@ from dataclasses import dataclass
 
 
 @dataclass
+class SourceParams:
+    """Per-source make/model resolved from the catalogue.
+
+    When available, scrapers use these instead of the raw watch strings,
+    giving correct casing and pre-resolved IDs.
+    """
+    make: str
+    model: str
+    make_id: str | None = None
+    model_id: str | None = None
+
+
+@dataclass
 class Listing:
     source: str
     title: str

@@ -5,7 +5,7 @@ import asyncio
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
-from .base import Filters, Listing, Scraper
+from .base import Filters, Listing, Scraper, SourceParams
 from .scrapers import get_all_scrapers
 
 
@@ -34,6 +34,7 @@ async def run(
     on_results=None,
     on_event=None,
     scrapers: list[Scraper] | None = None,
+    source_params: dict[str, SourceParams] | None = None,
 ) -> tuple[list[Listing], dict[str, str]]:
     if scrapers is None:
         scrapers = get_all_scrapers()
@@ -58,17 +59,27 @@ async def run(
 
     browser_scrapers = [s for s in scrapers if s.needs_browser]
     request_scrapers = [s for s in scrapers if not s.needs_browser]
+    sp = source_params or {}
 
     def _emit(event_type, source, **kwargs):
         if on_event:
             on_event(event_type, source, **kwargs)
 
+    def _effective(scraper: Scraper) -> tuple[str, str]:
+        """Return (make, model) to use for this scraper, from catalogue or raw."""
+        p = sp.get(scraper.name)
+        return (p.make, p.model) if p else (make, model)
+
+    def _sp(scraper: Scraper) -> SourceParams | None:
+        return sp.get(scraper.name)
+
     async def run_request_scraper(scraper: Scraper):
         page_cb = on_page(scraper.name)
+        em, emod = _effective(scraper)
         _emit("scraper_start", scraper.name)
         for attempt in range(3):
             try:
-                await scraper.scrape(None, make, model, filters, on_page=page_cb)
+                await scraper.scrape(None, em, emod, filters, on_page=page_cb, source_params=_sp(scraper))
                 _emit("scraper_done", scraper.name)
                 return
             except Exception as e:
@@ -90,19 +101,20 @@ async def run(
 
             async def _scrape(scraper: Scraper):
                 page_cb = on_page(scraper.name)
+                em, emod = _effective(scraper)
                 _emit("scraper_start", scraper.name)
                 for attempt in range(3):
                     page = await browser.new_page()
                     try:
                         if scraper.self_navigates:
-                            await scraper.scrape(page, make, model, filters, on_page=page_cb)
+                            await scraper.scrape(page, em, emod, filters, on_page=page_cb, source_params=_sp(scraper))
                         else:
-                            url = scraper.build_url(make, model, filters)
+                            url = scraper.build_url(em, emod, filters)
                             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                             await page.wait_for_timeout(3000)
                             await _dismiss_cookies(page)
                             await page.wait_for_timeout(2000)
-                            await scraper.scrape(page, make, model, filters, on_page=page_cb)
+                            await scraper.scrape(page, em, emod, filters, on_page=page_cb, source_params=_sp(scraper))
                         _emit("scraper_done", scraper.name)
                         return
                     except Exception as e:

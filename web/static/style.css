@@ -606,6 +606,55 @@ input:focus { outline: none; border-color: var(--accent); }
 .dashboard-watch-stats { color: var(--text-muted); font-size: 0.85rem; }
 .dashboard-watch-last { color: var(--text-muted); font-size: 0.8rem; }
 
+/* ── catalogue ──────────────────────────────────────────────────────────── */
+.catalogue-section { margin-bottom: 20px; }
+.catalogue-makes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.catalogue-make-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.9rem;
+}
+.catalogue-make-card:hover { background: var(--bg-hover); }
+.catalogue-make-name { font-weight: 500; }
+.catalogue-make-count { color: var(--text-muted); font-size: 0.8rem; }
+
+.catalogue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.catalogue-table th, .catalogue-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.catalogue-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.catalogue-table .source-col {
+  text-align: center;
+  width: 80px;
+  min-width: 80px;
+}
+.catalogue-table .source-col.has { color: var(--green); font-weight: 600; }
+.catalogue-table .model-name { font-weight: 500; }
+.catalogue-table .text-muted { color: var(--text-muted); }
+
 /* ── responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   :root { --sidebar-w: 220px; --panel-w: 100vw; }

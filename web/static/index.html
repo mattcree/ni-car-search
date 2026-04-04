@@ -19,6 +19,10 @@
       <div id="home-row" class="watch-card" onclick="goHome()">
         <div class="watch-card-title">Dashboard</div>
       </div>
+      <div id="catalogue-row" class="watch-card" onclick="showCatalogue()">
+        <div class="watch-card-title">Catalogue</div>
+        <div class="watch-card-meta" id="catalogue-row-meta"></div>
+      </div>
       <div id="watch-list"></div>
     </nav>
 
@@ -46,6 +50,11 @@
         </div>
       </div>
 
+      <!-- Catalogue -->
+      <div id="view-catalogue" class="view">
+        <div id="catalogue-content"></div>
+      </div>
+
       <!-- Settings -->
       <div id="view-settings" class="view">
         <h2>Notifications</h2>
@@ -70,8 +79,14 @@
       <form id="watch-form" onsubmit="submitWatch(event)">
         <input type="hidden" name="id">
         <div class="form-row">
-          <label>Make <input type="text" name="make" required placeholder="e.g. skoda"></label>
-          <label>Model <input type="text" name="model" required placeholder="e.g. superb"></label>
+          <label>Make
+            <select name="make_id" onchange="onMakeSelected(this)" style="display:none"></select>
+            <input type="text" name="make" required placeholder="e.g. skoda">
+          </label>
+          <label>Model
+            <select name="model_id" onchange="onModelSelected(this)" style="display:none"></select>
+            <input type="text" name="model" required placeholder="e.g. superb">
+          </label>
         </div>
         <div class="form-row">
           <label>Location

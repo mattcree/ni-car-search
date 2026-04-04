@@ -483,6 +483,88 @@ def scheduler_jobs():
     return get_scheduled_jobs()
 
 
+# ── catalogue ───────────────────────────────────────────────────────────────
+
+
+@app.get("/api/catalogue/makes")
+def catalogue_makes(conn: Conn = Depends(db_dependency)):
+    rows = conn.execute(
+        """SELECT cm.id, cm.canonical_name AS name, cm.normalized,
+                  COUNT(cmo.id) AS model_count
+        FROM catalogue_makes cm
+        LEFT JOIN catalogue_models cmo ON cmo.make_id = cm.id
+        GROUP BY cm.id ORDER BY cm.canonical_name"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/catalogue/makes/{make_id}")
+def catalogue_make_detail(make_id: int, conn: Conn = Depends(db_dependency)):
+    row = conn.execute(
+        "SELECT * FROM catalogue_makes WHERE id=?", (make_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, detail="Make not found")
+    make = dict(row)
+
+    # Per-source aliases for this make
+    aliases = conn.execute(
+        "SELECT source, source_make, source_make_id FROM catalogue_source_aliases WHERE make_id=? AND model_id IS NULL ORDER BY source",
+        (make_id,),
+    ).fetchall()
+    make["source_aliases"] = [dict(a) for a in aliases]
+
+    # Models with their source aliases
+    models = []
+    for m in conn.execute(
+        "SELECT id, canonical_name AS name, normalized FROM catalogue_models WHERE make_id=? ORDER BY canonical_name",
+        (make_id,),
+    ).fetchall():
+        md = dict(m)
+        ma = conn.execute(
+            "SELECT source, source_model, source_model_id FROM catalogue_source_aliases WHERE make_id=? AND model_id=? ORDER BY source",
+            (make_id, m["id"]),
+        ).fetchall()
+        md["source_aliases"] = [dict(a) for a in ma]
+        models.append(md)
+    make["models"] = models
+    return make
+
+
+@app.get("/api/catalogue/makes/{make_id}/models")
+def catalogue_models(make_id: int, conn: Conn = Depends(db_dependency)):
+    rows = conn.execute(
+        "SELECT id, canonical_name AS name, normalized FROM catalogue_models WHERE make_id=? ORDER BY canonical_name",
+        (make_id,),
+    ).fetchall()
+    result = []
+    for r in rows:
+        sources = conn.execute(
+            "SELECT DISTINCT source FROM catalogue_source_aliases WHERE make_id=? AND model_id=?",
+            (make_id, r["id"]),
+        ).fetchall()
+        d = dict(r)
+        d["sources"] = [s["source"] for s in sources]
+        result.append(d)
+    return result
+
+
+@app.post("/api/catalogue/harvest")
+async def trigger_harvest(conn: Conn = Depends(db_dependency)):
+    from carsearch.catalogue import run_harvest
+    results = await run_harvest(conn)
+    return results
+
+
+@app.get("/api/catalogue/harvest/status")
+def harvest_status(conn: Conn = Depends(db_dependency)):
+    rows = conn.execute(
+        """SELECT source, status, makes_found, models_found, started_at, finished_at, error
+        FROM catalogue_harvest_runs ORDER BY started_at DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ── static files ────────────────────────────────────────────────────────────
 
 

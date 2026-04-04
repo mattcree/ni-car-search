@@ -6,7 +6,7 @@ from typing import Generator
 
 from .config import DB_PATH
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _connect() -> sqlite3.Connection:
@@ -145,6 +145,54 @@ def init_db() -> None:
                 ON vehicles(watch_id, status);
             CREATE INDEX IF NOT EXISTS idx_vehicles_watch_fp
                 ON vehicles(watch_id, fingerprint);
+            -- ── catalogue ────────────────────────────────────────────────
+
+            CREATE TABLE IF NOT EXISTS catalogue_makes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                canonical_name TEXT NOT NULL UNIQUE,
+                normalized TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS catalogue_models (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                make_id INTEGER NOT NULL REFERENCES catalogue_makes(id) ON DELETE CASCADE,
+                canonical_name TEXT NOT NULL,
+                normalized TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(make_id, normalized)
+            );
+
+            CREATE TABLE IF NOT EXISTS catalogue_source_aliases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                make_id INTEGER NOT NULL REFERENCES catalogue_makes(id) ON DELETE CASCADE,
+                model_id INTEGER REFERENCES catalogue_models(id) ON DELETE CASCADE,
+                source_make TEXT NOT NULL,
+                source_model TEXT,
+                source_make_id TEXT,
+                source_model_id TEXT,
+                UNIQUE(source, make_id, model_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS catalogue_harvest_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                makes_found INTEGER DEFAULT 0,
+                models_found INTEGER DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'running',
+                error TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_cat_makes_norm
+                ON catalogue_makes(normalized);
+            CREATE INDEX IF NOT EXISTS idx_cat_models_make
+                ON catalogue_models(make_id);
+            CREATE INDEX IF NOT EXISTS idx_cat_aliases_source
+                ON catalogue_source_aliases(source, make_id);
+
             CREATE INDEX IF NOT EXISTS idx_listings_watch_status
                 ON listings(watch_id, status);
             CREATE INDEX IF NOT EXISTS idx_listings_vehicle

@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 
 from carsearch.base import Filters, resolve_location
+from carsearch.catalogue import resolve_source_params
 from carsearch.runner import run
 from carsearch.scrapers import get_all_scrapers
 
@@ -202,10 +203,17 @@ async def run_scrape(watch: dict, on_progress=None) -> dict:
                 _log_event("SCRAPER_ERROR", source=source, message=kwargs.get("error"))
                 _emit({"type": "scraper_error", "source": source, "message": kwargs.get("error", "")})
 
+    # Look up per-source aliases from the catalogue (if populated).
+    with get_db() as cat_conn:
+        sp = resolve_source_params(cat_conn, watch["make"], watch["model"])
+    if sp:
+        log.info("Catalogue resolved %d source aliases for %s %s", len(sp), watch["make"], watch["model"])
+
     try:
         scraped, errors = await run(
             watch["make"], watch["model"], filters,
             on_results=on_results, on_event=on_event,
+            source_params=sp or None,
         )
     except Exception as exc:
         with get_db() as conn:

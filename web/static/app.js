@@ -137,9 +137,10 @@ function switchTab(tab) {
 
 async function showWatch(id) {
   currentWatchId = id;
+  currentView = "watch";
   showView("view-watch");
   renderWatchList();
-  updateHomeRow();
+  updateSidebarHighlight();
 
   const watch = watches.find(w => w.id === id);
   if (!watch) return;
@@ -582,6 +583,74 @@ function hidePollProgress() {
 
 /* ── watch form ─────────────────────────────────────────────────────────── */
 
+let catalogueMakes = null; // cached on first load
+
+async function loadCatalogueMakes() {
+  if (catalogueMakes !== null) return catalogueMakes;
+  try {
+    catalogueMakes = await api("GET", "/catalogue/makes");
+  } catch {
+    catalogueMakes = [];
+  }
+  return catalogueMakes;
+}
+
+async function populateMakeDropdown(form, selectedNormalized) {
+  const makes = await loadCatalogueMakes();
+  const select = form.elements.make_id;
+  const input = form.elements.make;
+
+  if (!makes.length) {
+    // No catalogue — show free text
+    select.style.display = "none";
+    input.style.display = "block";
+    return;
+  }
+
+  select.innerHTML = '<option value="">Select make...</option>' +
+    makes.map(m => `<option value="${m.id}" data-norm="${esc(m.normalized)}">${esc(m.name)}</option>`).join("");
+  select.style.display = "block";
+  input.style.display = "none";
+
+  if (selectedNormalized) {
+    const match = makes.find(m => m.normalized === selectedNormalized);
+    if (match) select.value = String(match.id);
+  }
+}
+
+async function onMakeSelected(select) {
+  const form = select.closest("form");
+  const makeId = select.value;
+  const modelSelect = form.elements.model_id;
+  const modelInput = form.elements.model;
+
+  // Set hidden text input to normalized value
+  const opt = select.selectedOptions[0];
+  if (opt) form.elements.make.value = opt.dataset.norm || "";
+
+  if (!makeId) {
+    modelSelect.innerHTML = '<option value="">Select model...</option>';
+    return;
+  }
+
+  try {
+    const models = await api("GET", `/catalogue/makes/${makeId}/models`);
+    modelSelect.innerHTML = '<option value="">Select model...</option>' +
+      models.map(m => `<option value="${m.id}" data-norm="${esc(m.normalized)}">${esc(m.name)}</option>`).join("");
+    modelSelect.style.display = "block";
+    modelInput.style.display = "none";
+  } catch {
+    modelSelect.style.display = "none";
+    modelInput.style.display = "block";
+  }
+}
+
+function onModelSelected(select) {
+  const form = select.closest("form");
+  const opt = select.selectedOptions[0];
+  if (opt) form.elements.model.value = opt.dataset.norm || "";
+}
+
 function showWatchForm(watch) {
   const form = document.getElementById("watch-form");
   form.reset();
@@ -601,6 +670,23 @@ function showWatchForm(watch) {
     document.getElementById("watch-form-title").textContent = "Add Watch";
   }
   document.getElementById("modal-overlay").classList.add("open");
+
+  // Populate catalogue dropdowns
+  populateMakeDropdown(form, watch ? watch.make : null).then(() => {
+    if (watch && watch.make) {
+      // Trigger model population for edit case
+      const makeSelect = form.elements.make_id;
+      if (makeSelect.value) {
+        onMakeSelected(makeSelect).then(() => {
+          const modelSelect = form.elements.model_id;
+          const models = modelSelect.options;
+          for (const opt of models) {
+            if (opt.dataset.norm === watch.model) { modelSelect.value = opt.value; break; }
+          }
+        });
+      }
+    }
+  });
 }
 
 function closeModal(e) {
@@ -611,9 +697,10 @@ function closeModal(e) {
 async function submitWatch(e) {
   e.preventDefault();
   const form = e.target;
+  // make/model come from the hidden text inputs (set by dropdown onChange or typed directly)
   const data = {
-    make: form.elements.make.value,
-    model: form.elements.model.value,
+    make: form.elements.make.value.trim().toLowerCase(),
+    model: form.elements.model.value.trim().toLowerCase(),
     location: form.elements.location.value || "northern-ireland",
     radius: form.elements.radius.value ? parseInt(form.elements.radius.value) : null,
     min_price: form.elements.min_price.value ? parseInt(form.elements.min_price.value) : null,
@@ -649,7 +736,7 @@ async function deleteWatch(id) {
 /* ── settings ───────────────────────────────────────────────────────────── */
 
 async function showSettings() {
-  currentWatchId = null; renderWatchList(); showView("view-settings");
+  currentWatchId = null; currentView = "settings"; renderWatchList(); updateSidebarHighlight(); showView("view-settings");
   try {
     const settings = await api("GET", "/settings");
     const form = document.getElementById("settings-form");
@@ -669,10 +756,152 @@ async function saveSettings(e) {
 
 /* ── init ────────────────────────────────────────────────────────────────── */
 
+/* ── catalogue ───────────────────────────────────────────────────────────── */
+
+async function showCatalogue() {
+  currentWatchId = null;
+  currentView = "catalogue";
+  renderWatchList();
+  updateSidebarHighlight();
+  showView("view-catalogue");
+  await renderCatalogueHome();
+}
+
+async function renderCatalogueHome() {
+  const el = document.getElementById("catalogue-content");
+  el.innerHTML = '<p style="color:var(--text-muted)">Loading catalogue...</p>';
+
+  try {
+    const [makes, status] = await Promise.all([
+      api("GET", "/catalogue/makes"),
+      api("GET", "/catalogue/harvest/status"),
+    ]);
+
+    catalogueMakes = makes;
+    const latestBySource = {};
+    for (const s of status) {
+      if (!latestBySource[s.source]) latestBySource[s.source] = s;
+    }
+
+    let harvestHtml = '<div class="catalogue-section"><div class="run-section-title">Sources</div>';
+    for (const [src, s] of Object.entries(latestBySource)) {
+      const icon = s.status === "completed" ? "\u2713" : s.status === "failed" ? "\u2717" : "\u23f3";
+      const cls = s.status === "completed" ? "done" : s.status === "failed" ? "error" : "active";
+      harvestHtml += `<div class="run-scraper ${cls}">
+        <span>${icon} ${esc(src)}</span>
+        <span>${s.makes_found} makes, ${s.models_found} models &middot; ${relativeTime(s.finished_at || s.started_at)}</span>
+      </div>`;
+    }
+    if (!Object.keys(latestBySource).length) {
+      harvestHtml += '<p style="color:var(--text-muted)">No harvest runs yet.</p>';
+    }
+    harvestHtml += '</div>';
+
+    let makesHtml = '<div class="catalogue-section"><div class="run-section-title">Makes (' + makes.length + ')</div>';
+    makesHtml += '<div class="catalogue-makes-grid">';
+    for (const m of makes) {
+      makesHtml += `<div class="catalogue-make-card" onclick="showCatalogueMake(${m.id})">
+        <span class="catalogue-make-name">${esc(m.name)}</span>
+        <span class="catalogue-make-count">${m.model_count} models</span>
+      </div>`;
+    }
+    makesHtml += '</div></div>';
+
+    el.innerHTML = `
+      <div class="watch-title-row">
+        <h2>Catalogue</h2>
+        <button class="btn btn-sm btn-primary" id="harvest-btn" onclick="runHarvest()">Sync Now</button>
+      </div>
+      ${harvestHtml}
+      ${makesHtml}
+    `;
+
+    document.getElementById("catalogue-row-meta").textContent = makes.length + " makes";
+  } catch (err) {
+    el.innerHTML = '<p style="color:var(--red)">Failed to load catalogue.</p>';
+    toast("Failed to load catalogue: " + err.message);
+  }
+}
+
+async function showCatalogueMake(makeId) {
+  const el = document.getElementById("catalogue-content");
+  try {
+    const make = await api("GET", `/catalogue/makes/${makeId}`);
+    const allSources = [...new Set(make.source_aliases.map(a => a.source))].sort();
+
+    // Source names table
+    let aliasRows = make.source_aliases.map(a =>
+      `<tr>
+        <td><span class="source-badge">${esc(a.source)}</span></td>
+        <td>${esc(a.source_make)}</td>
+        <td class="text-muted">${a.source_make_id ? esc(a.source_make_id) : '-'}</td>
+      </tr>`
+    ).join("");
+    let aliasesHtml = aliasRows
+      ? `<table class="catalogue-table">
+          <thead><tr><th>Source</th><th>Name Used</th><th>ID</th></tr></thead>
+          <tbody>${aliasRows}</tbody>
+        </table>`
+      : '<p class="text-muted">No source aliases.</p>';
+
+    // Models table with source coverage columns
+    const sourceHeaders = allSources.map(s => `<th class="source-col">${esc(s)}</th>`).join("");
+    let modelRows = make.models.map(m => {
+      const sourceSet = new Set(m.source_aliases.map(a => a.source));
+      const cells = allSources.map(s =>
+        sourceSet.has(s)
+          ? '<td class="source-col has">\u2713</td>'
+          : '<td class="source-col"></td>'
+      ).join("");
+      return `<tr><td class="model-name">${esc(m.name)}</td>${cells}</tr>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="watch-title-row">
+        <button class="btn btn-sm" onclick="renderCatalogueHome()">\u2190 Back</button>
+        <h2>${esc(make.canonical_name)}</h2>
+      </div>
+      <div class="catalogue-section">
+        <div class="run-section-title">Source Names</div>
+        ${aliasesHtml}
+      </div>
+      <div class="catalogue-section">
+        <div class="run-section-title">Models (${make.models.length})</div>
+        <table class="catalogue-table">
+          <thead><tr><th>Model</th>${sourceHeaders}</tr></thead>
+          <tbody>${modelRows}</tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    toast("Failed to load make: " + err.message);
+  }
+}
+
+async function runHarvest() {
+  const btn = document.getElementById("harvest-btn");
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Syncing\u2026'; }
+  try {
+    const results = await api("POST", "/catalogue/harvest");
+    const parts = Object.entries(results).map(([s, r]) =>
+      r.status === "completed" ? `${s}: ${r.makes} makes` : `${s}: ${r.status}`
+    );
+    toast("Harvest done: " + parts.join(", "));
+    catalogueMakes = null;
+    await renderCatalogueHome();
+  } catch (err) {
+    toast("Harvest failed: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Sync Now"; }
+  }
+}
+
+/* ── init ────────────────────────────────────────────────────────────────── */
+
 document.addEventListener("DOMContentLoaded", async () => {
   await loadWatches();
   renderDashboard();
-  updateHomeRow();
+  updateSidebarHighlight();
 });
 
 document.addEventListener("keydown", (e) => {
@@ -681,13 +910,18 @@ document.addEventListener("keydown", (e) => {
 
 function goHome() {
   currentWatchId = null;
+  currentView = "dashboard";
   renderWatchList();
-  updateHomeRow();
+  updateSidebarHighlight();
   showView("view-empty");
   renderDashboard();
 }
 
-function updateHomeRow() {
-  const row = document.getElementById("home-row");
-  if (row) row.classList.toggle("active", currentWatchId === null);
+let currentView = "dashboard"; // "dashboard" | "catalogue" | "watch" | "settings"
+
+function updateSidebarHighlight() {
+  const homeRow = document.getElementById("home-row");
+  const catRow = document.getElementById("catalogue-row");
+  if (homeRow) homeRow.classList.toggle("active", currentView === "dashboard");
+  if (catRow) catRow.classList.toggle("active", currentView === "catalogue");
 }

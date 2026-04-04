@@ -50,7 +50,7 @@ class AutoTraderScraper(Scraper):
             params["year-to"] = filters.max_year
         return f"https://www.autotrader.co.uk/car-search?{urlencode(params)}"
 
-    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
+    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None, source_params=None) -> list[Listing]:
         results = []
         page_num = 1
         seen_links: set[str] = set()

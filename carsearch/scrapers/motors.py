@@ -37,7 +37,7 @@ class MotorsScraper(Scraper):
         params = {"Make": make.title(), "Model": model.title(), "Postcode": filters.postcode}
         return f"https://www.motors.co.uk/search/car/?{urlencode(params)}"
 
-    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
+    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None, source_params=None) -> list[Listing]:
         url = self.build_url(make, model, filters)
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(5000)

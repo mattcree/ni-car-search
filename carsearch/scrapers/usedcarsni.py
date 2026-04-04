@@ -111,12 +111,15 @@ class UsedCarsNIScraper(Scraper):
             params["pagepc0"] = page
         return f"https://www.usedcarsni.com/search_results.php?{urlencode(params)}"
 
-    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None) -> list[Listing]:
-        ids = await self._resolve_ids(page, make, model)
-        if not ids:
-            raise ValueError(f"Could not find '{make} {model}' on UsedCarsNI")
-
-        make_id, model_id = ids
+    async def scrape(self, page, make: str, model: str, filters: Filters, on_page=None, source_params=None) -> list[Listing]:
+        # Use pre-resolved IDs from catalogue if available (skips homepage visit)
+        if source_params and source_params.make_id and source_params.model_id:
+            make_id, model_id = source_params.make_id, source_params.model_id
+        else:
+            ids = await self._resolve_ids(page, make, model)
+            if not ids:
+                raise ValueError(f"Could not find '{make} {model}' on UsedCarsNI")
+            make_id, model_id = ids
         results = []
         page_num = 1
         seen_links: set[str] = set()
