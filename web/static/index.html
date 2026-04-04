@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CarSearch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -11,17 +14,19 @@
     <nav id="sidebar">
       <div class="sidebar-header">
         <h1>CarSearch</h1>
-        <button class="btn btn-sm" onclick="showSettings()">Settings</button>
       </div>
       <div class="sidebar-actions">
         <button class="btn btn-primary btn-block" onclick="showWatchForm()">+ Add Watch</button>
       </div>
       <div id="home-row" class="watch-card" onclick="goHome()">
-        <div class="watch-card-title">Dashboard</div>
+        <div class="watch-card-title">Feed</div>
       </div>
       <div id="catalogue-row" class="watch-card" onclick="showCatalogue()">
         <div class="watch-card-title">Catalogue</div>
         <div class="watch-card-meta" id="catalogue-row-meta"></div>
+      </div>
+      <div id="settings-row" class="watch-card" onclick="showSettings()">
+        <div class="watch-card-title">Settings</div>
       </div>
       <div id="watch-list"></div>
     </nav>
@@ -29,7 +34,7 @@
     <main id="content">
       <!-- Empty / dashboard state -->
       <div id="view-empty" class="view active">
-        <div id="dashboard"></div>
+        <div id="feed"></div>
       </div>
 
       <!-- Watch detail with tabs -->

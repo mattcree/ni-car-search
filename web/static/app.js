@@ -94,11 +94,16 @@ function renderWatchList() {
     return;
   }
   container.innerHTML = watches.map(w => {
-    const loc = w.location !== "northern-ireland" ? esc(w.location) : "NI";
     const hi = HEALTH_ICON[w.health] || HEALTH_ICON.unknown;
     const hc = HEALTH_CLASS[w.health] || HEALTH_CLASS.unknown;
     const polling = activePolls.has(w.id);
-    const nextRun = w.next_run ? relativeTime(new Date(Date.now() - (Date.now() - new Date(w.next_run).getTime())).toISOString()) : "";
+
+    // Next poll time
+    let nextLabel = "";
+    if (w.next_run) {
+      const mins = Math.max(0, Math.round((new Date(w.next_run) - Date.now()) / 60000));
+      nextLabel = `Next: ${mins}m`;
+    }
 
     return `
     <div class="watch-card ${w.id === currentWatchId ? 'active' : ''}"
@@ -107,14 +112,9 @@ function renderWatchList() {
         <span class="${hc}">${hi}</span> ${esc(w.make)} ${esc(w.model)}
       </div>
       <div class="watch-card-meta">
-        ${loc}${w.radius ? " / " + w.radius + " mi" : ""}
-        &middot; every ${w.poll_interval_minutes}m
-        ${w.last_polled_at ? "&middot; " + relativeTime(w.last_polled_at) : ""}
-      </div>
-      <div class="watch-card-stats">
+        <span>${w.active_count} active</span>
+        ${nextLabel ? `<span>${nextLabel}</span>` : ''}
         ${polling ? '<span class="polling-indicator"><span class="spinner"></span> Polling</span>' : ''}
-        <span class="stat-active">${w.active_count} active</span>
-        <span class="stat-gone">${w.gone_count} gone</span>
       </div>
     </div>`;
   }).join("");
@@ -226,23 +226,45 @@ function renderVehicles() {
     container.innerHTML = '<p style="color:var(--text-muted);margin-top:20px">No vehicles found. Hit "Poll Now" to run a scrape.</p>';
     return;
   }
+  const SOURCE_ABBR = { AutoTrader: "AT", Motors: "M", Gumtree: "GT", UsedCarsNI: "UCNI", NIVehicleSales: "NIVS" };
+
   container.innerHTML = `
     <table class="listing-table">
       <thead><tr>
-        <th>Title</th><th>Price</th><th>Year</th><th>Mileage</th><th>Trans</th><th>Sites</th><th>Status</th><th>First Seen</th>
+        <th>Title</th><th>Price</th><th>Year</th><th>Mileage</th><th>Trans</th><th>Sites</th><th>First Seen</th>
       </tr></thead>
       <tbody>
-        ${currentVehicles.map(v => `
-          <tr onclick="showVehicle(${v.id})">
-            <td title="${esc(v.best_title)}">${esc(v.best_title)}</td>
-            <td class="price">${formatPrice(v.best_price)}</td>
+        ${currentVehicles.map(v => {
+          // Signal stripe class
+          let stripe = "";
+          if (v.is_new) stripe = "row-signal-new";
+          else if (v.price_direction) stripe = "row-signal-price";
+
+          // Price delta indicator
+          let delta = "";
+          if (v.price_delta && v.price_direction) {
+            const arrow = v.price_direction === "down" ? "\u25be" : "\u25b4";
+            const cls = v.price_direction === "down" ? "price-trend down" : "price-trend up";
+            delta = ` <span class="${cls}">${arrow}\u00a3${v.price_delta.toLocaleString()}</span>`;
+          }
+
+          // Source abbreviations
+          const sources = v.sources.map(s => SOURCE_ABBR[s] || s).join(", ");
+
+          // Status: only show for gone
+          const gone = v.status !== "active" ? ' <span class="status-badge gone">gone</span>' : "";
+
+          return `
+          <tr class="${stripe}" onclick="showVehicle(${v.id})">
+            <td title="${esc(v.best_title)}">${esc(v.best_title)}${gone}</td>
+            <td class="price">${formatPrice(v.best_price)}${delta}</td>
             <td>${v.year || '-'}</td>
             <td>${v.mileage_bucket != null ? '~' + (v.mileage_bucket * 1000).toLocaleString() : '-'}</td>
             <td>${esc(v.transmission || '-')}</td>
-            <td>${v.sources.map(s => '<span class="source-badge">' + esc(s) + '</span>').join(" ")}</td>
-            <td><span class="status-badge ${v.status === 'active' ? 'active' : 'gone'}">${esc(v.status)}</span></td>
+            <td class="source">${esc(sources)}</td>
             <td>${formatDate(v.first_seen_at)}</td>
-          </tr>`).join("")}
+          </tr>`;
+        }).join("")}
       </tbody>
     </table>`;
 }
@@ -368,45 +390,94 @@ async function toggleRunDetail(card, runId) {
   }
 }
 
-/* ── dashboard (no watch selected) ──────────────────────────────────────── */
+/* ── feed (replaces dashboard) ───────────────────────────────────────────── */
 
-function renderDashboard() {
-  const el = document.getElementById("dashboard");
+const SIGNAL_LABELS = {
+  FOUND: "NEW", NEW_SOURCE: "CROSS-LISTED", PRICE_CHANGE: "PRICE",
+  SOURCE_GONE: "DELISTED", GONE: "GONE", RETURNED: "RETURNED",
+};
+const SIGNAL_CLASS = {
+  FOUND: "signal-new", NEW_SOURCE: "signal-lead", PRICE_CHANGE: "signal-price",
+  SOURCE_GONE: "signal-gone", GONE: "signal-gone", RETURNED: "signal-lead",
+};
+
+async function renderFeed() {
+  const el = document.getElementById("feed");
   if (!watches.length) {
-    el.innerHTML = '<div class="empty-state"><h2>No watches yet</h2><p>Add a watch to start tracking car listings.</p></div>';
+    el.innerHTML = '<div class="empty-state"><h2>No watches yet</h2><p>Add a watch and run your first poll.</p></div>';
     return;
   }
 
-  const healthy = watches.filter(w => w.health === "healthy").length;
-  const degraded = watches.filter(w => w.health === "degraded").length;
-  const failing = watches.filter(w => w.health === "failing").length;
-  const totalVehicles = watches.reduce((a, w) => a + w.vehicle_count, 0);
   const totalActive = watches.reduce((a, w) => a + w.active_count, 0);
+  const totalGone = watches.reduce((a, w) => a + w.gone_count, 0);
 
-  el.innerHTML = `
-    <div class="dashboard">
-      <h2>Dashboard</h2>
-      <div class="stats-bar">
-        <div class="stat-card"><div class="stat-value">${watches.length}</div><div class="stat-label">Watches</div></div>
-        <div class="stat-card"><div class="stat-value health-ok">${healthy}</div><div class="stat-label">Healthy</div></div>
-        ${degraded ? `<div class="stat-card"><div class="stat-value health-warn">${degraded}</div><div class="stat-label">Degraded</div></div>` : ''}
-        ${failing ? `<div class="stat-card"><div class="stat-value health-bad">${failing}</div><div class="stat-label">Failing</div></div>` : ''}
-        <div class="stat-card"><div class="stat-value">${totalVehicles}</div><div class="stat-label">Vehicles</div></div>
-        <div class="stat-card"><div class="stat-value">${totalActive}</div><div class="stat-label">Active</div></div>
-      </div>
-      <h3 style="margin-top:24px;margin-bottom:12px">Watches</h3>
-      ${watches.map(w => {
-        const hc = HEALTH_CLASS[w.health] || HEALTH_CLASS.unknown;
-        const hi = HEALTH_ICON[w.health] || HEALTH_ICON.unknown;
-        return `
-        <div class="dashboard-watch" onclick="showWatch(${w.id})">
-          <span class="${hc}">${hi}</span>
-          <span class="dashboard-watch-name">${esc(w.make)} ${esc(w.model)}</span>
-          <span class="dashboard-watch-stats">${w.active_count} active, ${w.gone_count} gone</span>
-          <span class="dashboard-watch-last">${w.last_polled_at ? relativeTime(w.last_polled_at) : 'never polled'}</span>
+  // Find next poll
+  let nextPoll = "";
+  for (const w of watches) {
+    if (w.next_run) {
+      const mins = Math.max(0, Math.round((new Date(w.next_run) - Date.now()) / 60000));
+      nextPoll = `Next poll: ${esc(w.make)} ${esc(w.model)} in ${mins}m`;
+      break;
+    }
+  }
+
+  const strip = `<div class="stats-strip">
+    <span><strong>${watches.length}</strong> watches</span>
+    <span class="stats-sep">\u00b7</span>
+    <span><strong>${totalActive}</strong> active</span>
+    <span class="stats-sep">\u00b7</span>
+    <span><strong>${totalGone}</strong> gone</span>
+    ${nextPoll ? `<span class="stats-sep">\u00b7</span><span class="stats-strip-next">${nextPoll}</span>` : ''}
+  </div>`;
+
+  // Load feed events
+  const lastSeen = localStorage.getItem("feed_last_seen") || "";
+  let feedHtml = "";
+
+  try {
+    const events = await api("GET", `/feed?limit=200`);
+    if (!events.length) {
+      feedHtml = '<p style="color:var(--ink-faint);padding:var(--sp-8) 0;text-align:center">No activity yet. Poll a watch to see events here.</p>';
+    } else {
+      const newCount = lastSeen ? events.filter(e => e.timestamp > lastSeen).length : 0;
+      if (newCount > 0) {
+        feedHtml += `<div class="overline">${newCount} new since last visit</div>`;
+      }
+      feedHtml += events.map(e => {
+        const label = SIGNAL_LABELS[e.event_type] || e.event_type;
+        const cls = SIGNAL_CLASS[e.event_type] || "";
+        let desc = esc(e.vehicle_title || "");
+        if (e.event_type === "PRICE_CHANGE" && e.old_price != null && e.price != null) {
+          const delta = e.price - e.old_price;
+          const pct = Math.round((delta / e.old_price) * 100);
+          const dir = delta < 0 ? "\u25be" : "\u25b4";
+          desc = `${formatPrice(e.old_price)} \u2192 ${formatPrice(e.price)} (${dir}${Math.abs(pct)}%)`;
+        } else if (e.price != null) {
+          desc += ` \u2014 ${formatPrice(e.price)}`;
+        }
+        if (e.source) desc += ` on ${esc(e.source)}`;
+
+        const isNew = lastSeen && e.timestamp > lastSeen;
+        return `<div class="feed-item${isNew ? ' feed-item-new' : ''}" onclick="showVehicleFromFeed(${e.vehicle_id}, ${e.watch_id})">
+          <span class="feed-time">${relativeTime(e.timestamp)}</span>
+          <span class="feed-signal ${cls}">${label}</span>
+          <span class="feed-watch">${esc(e.watch_make)} ${esc(e.watch_model)}</span>
+          <span class="feed-desc">${desc}</span>
         </div>`;
-      }).join("")}
-    </div>`;
+      }).join("");
+    }
+  } catch (err) {
+    feedHtml = `<p style="color:var(--signal-gone)">Failed to load feed.</p>`;
+  }
+
+  el.innerHTML = `<h2 class="feed-title">Feed</h2>${strip}${feedHtml}`;
+
+  // Mark as seen
+  localStorage.setItem("feed_last_seen", new Date().toISOString());
+}
+
+function showVehicleFromFeed(vehicleId, watchId) {
+  showVehicle(vehicleId);
 }
 
 /* ── vehicle detail panel ───────────────────────────────────────────────── */
@@ -900,7 +971,7 @@ async function runHarvest() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadWatches();
-  renderDashboard();
+  await renderFeed();
   updateSidebarHighlight();
 });
 
@@ -914,7 +985,7 @@ function goHome() {
   renderWatchList();
   updateSidebarHighlight();
   showView("view-empty");
-  renderDashboard();
+  renderFeed();
 }
 
 let currentView = "dashboard"; // "dashboard" | "catalogue" | "watch" | "settings"
@@ -922,6 +993,8 @@ let currentView = "dashboard"; // "dashboard" | "catalogue" | "watch" | "setting
 function updateSidebarHighlight() {
   const homeRow = document.getElementById("home-row");
   const catRow = document.getElementById("catalogue-row");
+  const setRow = document.getElementById("settings-row");
   if (homeRow) homeRow.classList.toggle("active", currentView === "dashboard");
   if (catRow) catRow.classList.toggle("active", currentView === "catalogue");
+  if (setRow) setRow.classList.toggle("active", currentView === "settings");
 }

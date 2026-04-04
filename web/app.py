@@ -17,6 +17,7 @@ from .config import LOG_LEVEL
 from .db import db_dependency, init_db
 from .models import (
     EventResponse,
+    FeedEventResponse,
     ListingResponse,
     RunDetailResponse,
     SchedulerJobResponse,
@@ -82,6 +83,61 @@ async def error_middleware(request: Request, call_next):
 def health(conn: Conn = Depends(db_dependency)):
     conn.execute("SELECT 1")
     return {"status": "ok"}
+
+
+# ── feed ────────────────────────────────────────────────────────────────────
+
+
+@app.get("/api/feed", response_model=list[FeedEventResponse])
+def get_feed(
+    since: str = Query(""),
+    limit: int = Query(100, ge=1, le=500),
+    conn: Conn = Depends(db_dependency),
+):
+    if since:
+        where = "WHERE ve.timestamp > ?"
+        params: list = [since, limit]
+    else:
+        where = ""
+        params = [limit]
+
+    rows = conn.execute(
+        f"""SELECT
+            ve.id, ve.event_type, ve.timestamp, ve.vehicle_id,
+            ve.price, ve.old_price, ve.source,
+            v.year AS vehicle_year, v.mileage_bucket,
+            v.transmission AS vehicle_transmission,
+            w.id AS watch_id, w.make AS watch_make, w.model AS watch_model,
+            (SELECT l.title FROM listings l
+             WHERE l.vehicle_id = v.id
+             ORDER BY LENGTH(l.title) DESC LIMIT 1) AS vehicle_title,
+            (SELECT MIN(l2.price) FROM listings l2
+             WHERE l2.vehicle_id = v.id AND l2.status = 'active'
+             AND l2.price IS NOT NULL) AS vehicle_price
+        FROM vehicle_events ve
+        JOIN vehicles v ON ve.vehicle_id = v.id
+        JOIN watches w ON v.watch_id = w.id
+        {where}
+        ORDER BY ve.timestamp DESC
+        LIMIT ?""",
+        params,
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/feed/count")
+def get_feed_count(
+    since: str = Query(""),
+    conn: Conn = Depends(db_dependency),
+):
+    if since:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM vehicle_events WHERE timestamp > ?",
+            (since,),
+        ).fetchone()
+    else:
+        row = conn.execute("SELECT COUNT(*) AS n FROM vehicle_events").fetchone()
+    return {"count": row["n"]}
 
 
 # ── watches ─────────────────────────────────────────────────────────────────
@@ -310,6 +366,27 @@ def watch_vehicles(
         v["best_price"] = min(prices) if prices else None
         v["listing_count"] = len(listings)
         v["sources"] = list({l["source"] for l in listings if l["status"] == "active"})
+
+        # Price change signal
+        last_change = conn.execute(
+            """SELECT price, old_price FROM vehicle_events
+            WHERE vehicle_id=? AND event_type='PRICE_CHANGE'
+            ORDER BY timestamp DESC LIMIT 1""",
+            (row["id"],),
+        ).fetchone()
+        if last_change and last_change["price"] and last_change["old_price"]:
+            delta = last_change["price"] - last_change["old_price"]
+            v["price_direction"] = "down" if delta < 0 else "up"
+            v["price_delta"] = abs(delta)
+        else:
+            v["price_direction"] = None
+            v["price_delta"] = None
+
+        # New vehicle flag (first seen within 48h)
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+        v["is_new"] = v["first_seen_at"] > cutoff
+
         vehicles.append(v)
 
     # Sort in Python since computed columns can't be sorted in SQL

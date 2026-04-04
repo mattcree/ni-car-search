@@ -108,6 +108,9 @@ class VehicleResponse(BaseModel):
     best_price: int | None = None
     listing_count: int = 0
     sources: list[str] = []
+    price_direction: str | None = None
+    price_delta: int | None = None
+    is_new: bool = False
 
 
 class VehicleDetailResponse(VehicleResponse):
@@ -161,6 +164,22 @@ class RunEventResponse(BaseModel):
 class RunDetailResponse(ScrapeRunResponse):
     run_events: list[RunEventResponse]
     vehicle_events: list[EventResponse]
+
+
+class FeedEventResponse(BaseModel):
+    id: int
+    event_type: str
+    timestamp: str
+    vehicle_id: int
+    vehicle_title: str
+    vehicle_year: int | None
+    vehicle_price: int | None
+    price: int | None
+    old_price: int | None
+    source: str | None
+    watch_id: int
+    watch_make: str
+    watch_model: str
 
 
 class SchedulerJobResponse(BaseModel):

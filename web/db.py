@@ -205,6 +205,8 @@ def init_db() -> None:
                 ON run_events(run_id);
             CREATE INDEX IF NOT EXISTS idx_runs_watch
                 ON scrape_runs(watch_id, started_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_events_timestamp
+                ON vehicle_events(timestamp DESC);
         """)
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES ('schema_version', ?)",
