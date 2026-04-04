@@ -756,6 +756,9 @@ function showWatchForm(watch) {
     form.elements.poll_interval_minutes.value = watch.poll_interval_minutes;
   } else {
     document.getElementById("watch-form-title").textContent = "Add Watch";
+    form.elements.id.value = "";
+    form.elements.make.value = "";
+    form.elements.model.value = "";
   }
   document.getElementById("modal-overlay").classList.add("open");
 
