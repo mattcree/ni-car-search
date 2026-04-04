@@ -67,6 +67,7 @@ async def send_notification(watch: dict, result: dict) -> None:
     settings = _get_settings()
     ntfy_url = settings.get("ntfy_url", "").rstrip("/")
     ntfy_topic = settings.get("ntfy_topic", "")
+    app_url = settings.get("app_url", "").rstrip("/")  # e.g. http://192.168.1.50:8000
 
     if not ntfy_url or not ntfy_topic:
         return
@@ -87,15 +88,19 @@ async def send_notification(watch: dict, result: dict) -> None:
     body = _build_body(result.get("run_id"))
 
     try:
+        headers = {
+            "Title": title,
+            "Tags": "car",
+            "Priority": "high" if result["new"] else "default",
+        }
+        # Tap notification to open the app at this watch
+        if app_url and watch.get("id"):
+            headers["Click"] = f"{app_url}/#watch/{watch['id']}"
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{ntfy_url}/{ntfy_topic}",
                 content=body or ", ".join(summary),
-                headers={
-                    "Title": title,
-                    "Tags": "car",
-                    "Priority": "high" if result["new"] else "default",
-                },
+                headers=headers,
                 timeout=10,
             )
     except Exception as e:

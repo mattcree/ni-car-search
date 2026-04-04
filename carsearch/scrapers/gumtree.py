@@ -160,6 +160,9 @@ class GumtreeScraper(Scraper):
         fuel_el = await article.query_selector('[data-q="motors-fuel-type"]')
         fuel_type = normalise_fuel((await fuel_el.inner_text()).strip()) if fuel_el else detect_fuel(title)
 
+        img_el = await article.query_selector("img")
+        image_url = (await img_el.get_attribute("src")) or "" if img_el else ""
+
         if filters.min_year or filters.max_year:
             try:
                 y = int(year)
@@ -173,5 +176,5 @@ class GumtreeScraper(Scraper):
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
-            transmission=transmission, fuel_type=fuel_type,
+            transmission=transmission, fuel_type=fuel_type, image_url=image_url,
         )

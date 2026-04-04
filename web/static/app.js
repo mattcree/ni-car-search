@@ -483,6 +483,10 @@ async function showVehicle(id) {
     const panel = document.getElementById("listing-panel");
     document.getElementById("panel-title").textContent = v.best_title;
 
+    // Show first available image
+    const imgListing = v.listings.find(l => l.image_url);
+    let imageHtml = imgListing ? `<img class="vehicle-image" src="${esc(imgListing.image_url)}" alt="">` : '';
+
     let listings = '<h4 style="margin-bottom:8px">Listings</h4>';
     for (const l of v.listings) {
       const statusClass = l.status === "active" ? "active" : "gone";
@@ -525,7 +529,7 @@ async function showVehicle(id) {
     }
     timeline += "</div>";
 
-    document.getElementById("panel-body").innerHTML = listings + timeline;
+    document.getElementById("panel-body").innerHTML = imageHtml + listings + timeline;
     panel.classList.add("open");
   } catch (err) { toast("Failed to load vehicle: " + err.message); }
 }
@@ -832,6 +836,7 @@ async function showSettings() {
     const form = document.getElementById("settings-form");
     form.elements.ntfy_url.value = settings.ntfy_url || "";
     form.elements.ntfy_topic.value = settings.ntfy_topic || "";
+    form.elements.app_url.value = settings.app_url || "";
   } catch (err) { toast("Failed to load settings: " + err.message); }
 }
 
@@ -839,7 +844,7 @@ async function saveSettings(e) {
   e.preventDefault();
   try {
     const form = e.target;
-    await api("PUT", "/settings", { ntfy_url: form.elements.ntfy_url.value, ntfy_topic: form.elements.ntfy_topic.value });
+    await api("PUT", "/settings", { ntfy_url: form.elements.ntfy_url.value, ntfy_topic: form.elements.ntfy_topic.value, app_url: form.elements.app_url.value });
     toast("Settings saved");
   } catch (err) { toast("Failed to save settings: " + err.message); }
 }

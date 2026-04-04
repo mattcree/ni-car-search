@@ -573,6 +573,13 @@ input:focus, select:focus { outline: none; border-color: var(--lead); }
 }
 
 /* ── source listings in detail panel ──────────────��─────────────────────── */
+.vehicle-image {
+  width: 100%;
+  border-radius: var(--radius);
+  margin-bottom: var(--sp-4);
+  border: 1px solid var(--rule);
+}
+
 .source-listing {
   padding: var(--sp-3);
   margin-bottom: var(--sp-2);

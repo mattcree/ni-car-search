@@ -89,6 +89,7 @@ def init_db() -> None:
                 transmission TEXT,
                 body_type TEXT,
                 fuel_type TEXT,
+                image_url TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 first_seen_at TEXT NOT NULL,
                 last_seen_at TEXT NOT NULL,

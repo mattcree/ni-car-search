@@ -151,8 +151,12 @@ class AutoTraderScraper(Scraper):
         fuel_el = await card.query_selector('[data-testid="fuel-type"]')
         fuel_type = (await fuel_el.inner_text()).strip() if fuel_el else detect_fuel(title)
 
+        # Image
+        img_el = await card.query_selector("img")
+        image_url = (await img_el.get_attribute("src")) or "" if img_el else ""
+
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
-            transmission=transmission, fuel_type=fuel_type,
+            transmission=transmission, fuel_type=fuel_type, image_url=image_url,
         )

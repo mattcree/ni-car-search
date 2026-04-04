@@ -34,6 +34,7 @@ class WatchUpdate(BaseModel):
 class SettingsUpdate(BaseModel):
     ntfy_url: str = ""
     ntfy_topic: str = ""
+    app_url: str = ""
 
 
 # ── response models ─────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ class ListingResponse(BaseModel):
     transmission: str | None
     body_type: str | None
     fuel_type: str | None
+    image_url: str | None
     status: str
     first_seen_at: str
     last_seen_at: str

@@ -461,10 +461,10 @@ def _insert_listing(conn, vehicle_id, watch_id, item, price, year, now) -> int:
     cur = conn.execute(
         """INSERT INTO listings
         (vehicle_id, watch_id, url, source, title, price, year, mileage,
-         location, transmission, body_type, fuel_type, first_seen_at, last_seen_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+         location, transmission, body_type, fuel_type, image_url, first_seen_at, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (vehicle_id, watch_id, item.link, item.source, item.title,
          price, year, item.mileage, item.location, item.transmission,
-         item.body, item.fuel_type, now, now),
+         item.body, item.fuel_type, item.image_url, now, now),
     )
     return cur.lastrowid

@@ -185,6 +185,9 @@ class UsedCarsNIScraper(Scraper):
 
         specs = await self._extract_specs(article)
 
+        img_el = await article.query_selector("img")
+        image_url = (await img_el.get_attribute("src")) or "" if img_el else ""
+
         year_match = re.search(r"\b(19|20)\d{2}\b", title)
         year = year_match.group(0) if year_match else "-"
 
@@ -194,6 +197,7 @@ class UsedCarsNIScraper(Scraper):
             link=link, body=specs.get("Body Style", "-"),
             transmission=specs.get("Transmission", "-"),
             fuel_type=normalise_fuel(specs.get("Fuel Type", specs.get("Fuel", "-"))),
+            image_url=image_url,
         )
 
     @staticmethod

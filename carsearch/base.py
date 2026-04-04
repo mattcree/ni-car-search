@@ -29,6 +29,7 @@ class Listing:
     body: str = "-"
     transmission: str = "-"
     fuel_type: str = "-"
+    image_url: str = ""
 
 
 LOCATIONS = {

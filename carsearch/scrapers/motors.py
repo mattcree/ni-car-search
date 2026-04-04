@@ -188,6 +188,9 @@ class MotorsScraper(Scraper):
 
         location = f"{dealer} {distance}".strip() if dealer else (distance or "-")
 
+        img_el = await card.query_selector("img")
+        image_url = (await img_el.get_attribute("src")) or "" if img_el else ""
+
         return Listing(
             source="Motors",
             title=title,
@@ -198,5 +201,6 @@ class MotorsScraper(Scraper):
             link=link,
             body=body,
             transmission=transmission,
+            image_url=image_url,
             fuel_type=fuel_type,
         )

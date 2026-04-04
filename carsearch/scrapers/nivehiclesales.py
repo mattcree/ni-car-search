@@ -122,6 +122,7 @@ class NIVehicleSalesScraper(Scraper):
                     body=item.get("body_type", "-") or "-",
                     transmission=item.get("transmission", "-") or "-",
                     fuel_type=normalise_fuel(item.get("fuel_type", "") or item.get("fuel", "") or "-"),
+                    image_url=item.get("vehicle_image_url", "") or "",
                 ))
 
             results.extend(page_results)
