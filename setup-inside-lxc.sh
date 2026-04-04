@@ -16,7 +16,7 @@ git clone https://github.com/mattcree/ni-car-search.git /opt/carsearch
 echo "=== Setting up Python ==="
 cd /opt/carsearch
 python3 -m venv venv
-venv/bin/pip install -e .
+venv/bin/pip install .
 venv/bin/playwright install chromium
 mkdir -p /root/.carsearch
 
@@ -50,7 +50,7 @@ set -euo pipefail
 echo "Updating CarSearch..."
 cd /opt/carsearch
 git pull --ff-only
-/opt/carsearch/venv/bin/pip install --quiet -e .
+/opt/carsearch/venv/bin/pip install --quiet .
 systemctl restart carsearch
 echo "Done."
 systemctl status carsearch --no-pager

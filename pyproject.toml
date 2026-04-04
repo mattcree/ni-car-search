@@ -15,5 +15,8 @@ dependencies = [
     "pydantic>=2",
 ]
 
+[tool.setuptools.packages.find]
+include = ["carsearch*", "web*"]
+
 [project.scripts]
 carsearch = "carsearch.__main__:main"
