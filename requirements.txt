@@ -2,3 +2,8 @@ playwright
 playwright-stealth
 requests
 rich
+fastapi
+uvicorn[standard]
+apscheduler>=3.10,<4
+httpx
+pydantic>=2

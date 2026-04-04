@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import requests
 
-from ..base import Filters, Listing, Scraper
+from ..base import Filters, Listing, Scraper, normalise_fuel
 
 API_URL = "https://ymhtnsjjdjemqoygqmna.supabase.co/rest/v1/vehicle_listings"
 ANON_KEY = (
@@ -114,6 +114,7 @@ class NIVehicleSalesScraper(Scraper):
                     link=link,
                     body=item.get("body_type", "-") or "-",
                     transmission=item.get("transmission", "-") or "-",
+                    fuel_type=normalise_fuel(item.get("fuel_type", "") or item.get("fuel", "") or "-"),
                 ))
 
             results.extend(page_results)

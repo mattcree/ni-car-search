@@ -1,0 +1,11 @@
+services:
+  carsearch:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/root/.carsearch
+    restart: unless-stopped
+
+volumes:
+  data:

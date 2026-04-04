@@ -15,6 +15,7 @@ class Listing:
     link: str
     body: str = "-"
     transmission: str = "-"
+    fuel_type: str = "-"
 
 
 NI_LOCATIONS = {
@@ -65,6 +66,46 @@ class Filters:
     radius: int = 0  # miles, 0 = no limit
     max_pages: int = 0  # 0 = no limit
 
+
+
+def normalise_fuel(raw: str) -> str:
+    """Normalise a fuel type string into a canonical label."""
+    if not raw or raw == "-":
+        return "-"
+    t = raw.lower().strip()
+    if t in ("electric", "full electric", "battery electric"):
+        return "Electric"
+    if any(x in t for x in ["plug-in", "plugin", "phev"]):
+        return "Plug-in Hybrid"
+    if any(x in t for x in ["mild hybrid", "mhev"]):
+        return "Mild Hybrid"
+    if "hybrid" in t:
+        return "Hybrid"
+    if t in ("diesel", "diesel/electric"):
+        return "Diesel"
+    if t in ("petrol", "petrol/electric", "unleaded"):
+        return "Petrol"
+    return raw.title()
+
+
+def detect_fuel(text: str) -> str:
+    """Detect fuel type from title/subtitle text using engine code heuristics."""
+    t = text.lower()
+    if any(x in t for x in ["electric", " ev ", " bev"]):
+        return "Electric"
+    if any(x in t for x in ["plug-in", "plugin", "phev"]):
+        return "Plug-in Hybrid"
+    if any(x in t for x in ["mild hybrid", "mhev"]):
+        return "Mild Hybrid"
+    if "hybrid" in t:
+        return "Hybrid"
+    if any(x in t for x in [" tdi", " cdi", " dci", " hdi", " jtd", " d4d", " crdi",
+                             "diesel", "bluetec"]):
+        return "Diesel"
+    if any(x in t for x in [" tsi", " tfsi", " fsi", " gdi", " vtec", " mpi",
+                             "petrol", " turbo "]):
+        return "Petrol"
+    return "-"
 
 
 class Scraper(ABC):

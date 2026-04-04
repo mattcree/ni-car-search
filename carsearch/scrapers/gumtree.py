@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
-from ..base import Filters, Listing, Scraper
+from ..base import Filters, Listing, Scraper, detect_fuel, normalise_fuel
 
 LOCATION_SLUGS = {
     "northern-ireland": "northern-ireland",
@@ -157,6 +157,9 @@ class GumtreeScraper(Scraper):
                     transmission = t.title()
                     break
 
+        fuel_el = await article.query_selector('[data-q="motors-fuel-type"]')
+        fuel_type = normalise_fuel((await fuel_el.inner_text()).strip()) if fuel_el else detect_fuel(title)
+
         if filters.min_year or filters.max_year:
             try:
                 y = int(year)
@@ -170,5 +173,5 @@ class GumtreeScraper(Scraper):
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
-            transmission=transmission,
+            transmission=transmission, fuel_type=fuel_type,
         )

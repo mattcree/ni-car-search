@@ -32,6 +32,7 @@ async def run(
     model: str,
     filters: Filters,
     on_results=None,
+    on_event=None,
     scrapers: list[Scraper] | None = None,
 ) -> tuple[list[Listing], dict[str, str]]:
     if scrapers is None:
@@ -39,6 +40,7 @@ async def run(
 
     all_listings: list[Listing] = []
     errors: dict[str, str] = {}
+    sources_with_results: set[str] = set()
 
     def on_page(source: str):
         """Return a callback that deduplicates across retries."""
@@ -48,6 +50,8 @@ async def run(
             for l in new:
                 seen.add(l.link)
             all_listings.extend(new)
+            if new:
+                sources_with_results.add(source)
             if on_results and new:
                 on_results(source, new)
         return _callback
@@ -55,16 +59,25 @@ async def run(
     browser_scrapers = [s for s in scrapers if s.needs_browser]
     request_scrapers = [s for s in scrapers if not s.needs_browser]
 
+    def _emit(event_type, source, **kwargs):
+        if on_event:
+            on_event(event_type, source, **kwargs)
+
     async def run_request_scraper(scraper: Scraper):
+        page_cb = on_page(scraper.name)
+        _emit("scraper_start", scraper.name)
         for attempt in range(3):
             try:
-                await scraper.scrape(None, make, model, filters, on_page=on_page(scraper.name))
+                await scraper.scrape(None, make, model, filters, on_page=page_cb)
+                _emit("scraper_done", scraper.name)
                 return
             except Exception as e:
                 if attempt < 2:
+                    _emit("scraper_retry", scraper.name, attempt=attempt + 1, error=str(e))
                     await asyncio.sleep(2 ** attempt)
                 else:
                     errors[scraper.name] = str(e)
+                    _emit("scraper_error", scraper.name, error=str(e))
 
     async def run_browser_scrapers():
         if not browser_scrapers:
@@ -76,24 +89,29 @@ async def run(
             browser = await p.chromium.launch(headless=True, channel="chrome")
 
             async def _scrape(scraper: Scraper):
+                page_cb = on_page(scraper.name)
+                _emit("scraper_start", scraper.name)
                 for attempt in range(3):
                     page = await browser.new_page()
                     try:
                         if scraper.self_navigates:
-                            await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
+                            await scraper.scrape(page, make, model, filters, on_page=page_cb)
                         else:
                             url = scraper.build_url(make, model, filters)
                             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                             await page.wait_for_timeout(3000)
                             await _dismiss_cookies(page)
                             await page.wait_for_timeout(2000)
-                            await scraper.scrape(page, make, model, filters, on_page=on_page(scraper.name))
+                            await scraper.scrape(page, make, model, filters, on_page=page_cb)
+                        _emit("scraper_done", scraper.name)
                         return
                     except Exception as e:
                         if attempt < 2:
+                            _emit("scraper_retry", scraper.name, attempt=attempt + 1, error=str(e))
                             await asyncio.sleep(2 ** attempt)
                         else:
                             errors[scraper.name] = str(e)
+                            _emit("scraper_error", scraper.name, error=str(e))
                     finally:
                         await page.close()
 
@@ -104,5 +122,11 @@ async def run(
         *[run_request_scraper(s) for s in request_scrapers],
         run_browser_scrapers(),
     )
+
+    # Flag scrapers that ran without error but returned nothing —
+    # likely blocked by bot detection.
+    for s in scrapers:
+        if s.name not in errors and s.name not in sources_with_results:
+            errors[s.name] = "returned 0 results (possibly blocked)"
 
     return all_listings, errors

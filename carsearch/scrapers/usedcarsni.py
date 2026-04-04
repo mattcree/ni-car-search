@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlencode
 
-from ..base import Filters, Listing, Scraper
+from ..base import Filters, Listing, Scraper, normalise_fuel
 
 class UsedCarsNIScraper(Scraper):
     name = "UsedCarsNI"
@@ -190,6 +190,7 @@ class UsedCarsNIScraper(Scraper):
             mileage=specs.get("Mileage", "-"), location=specs.get("Location", "-"),
             link=link, body=specs.get("Body Style", "-"),
             transmission=specs.get("Transmission", "-"),
+            fuel_type=normalise_fuel(specs.get("Fuel Type", specs.get("Fuel", "-"))),
         )
 
     @staticmethod

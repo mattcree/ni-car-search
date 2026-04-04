@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CarSearch</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <nav id="sidebar">
+      <div class="sidebar-header">
+        <h1>CarSearch</h1>
+        <button class="btn btn-sm" onclick="showSettings()">Settings</button>
+      </div>
+      <div class="sidebar-actions">
+        <button class="btn btn-primary btn-block" onclick="showWatchForm()">+ Add Watch</button>
+      </div>
+      <div id="home-row" class="watch-card" onclick="goHome()">
+        <div class="watch-card-title">Dashboard</div>
+      </div>
+      <div id="watch-list"></div>
+    </nav>
+
+    <main id="content">
+      <!-- Empty / dashboard state -->
+      <div id="view-empty" class="view active">
+        <div id="dashboard"></div>
+      </div>
+
+      <!-- Watch detail with tabs -->
+      <div id="view-watch" class="view">
+        <div id="watch-header"></div>
+        <div class="tab-bar" id="tab-bar">
+          <button class="tab active" data-tab="vehicles" onclick="switchTab('vehicles')">Vehicles</button>
+          <button class="tab" data-tab="activity" onclick="switchTab('activity')">Activity</button>
+        </div>
+        <div id="tab-vehicles" class="tab-content active">
+          <div id="watch-stats"></div>
+          <div id="poll-progress" class="poll-progress"></div>
+          <div id="listing-controls"></div>
+          <div id="listing-table"></div>
+        </div>
+        <div id="tab-activity" class="tab-content">
+          <div id="activity-log"></div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="view-settings" class="view">
+        <h2>Notifications</h2>
+        <p class="text-muted">Get push notifications via <a href="https://ntfy.sh" target="_blank">ntfy.sh</a> when new listings appear or prices change.</p>
+        <form id="settings-form" onsubmit="saveSettings(event)">
+          <label>Server URL
+            <input type="url" name="ntfy_url" placeholder="https://ntfy.sh">
+          </label>
+          <label>Topic
+            <input type="text" name="ntfy_topic" placeholder="my-car-alerts">
+          </label>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Watch form modal -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2 id="watch-form-title">Add Watch</h2>
+      <form id="watch-form" onsubmit="submitWatch(event)">
+        <input type="hidden" name="id">
+        <div class="form-row">
+          <label>Make <input type="text" name="make" required placeholder="e.g. skoda"></label>
+          <label>Model <input type="text" name="model" required placeholder="e.g. superb"></label>
+        </div>
+        <div class="form-row">
+          <label>Location
+            <input type="text" name="location" value="northern-ireland" placeholder="e.g. belfast">
+          </label>
+          <label>Radius (miles)
+            <input type="number" name="radius" placeholder="No limit">
+          </label>
+        </div>
+        <div class="form-row">
+          <label>Min Price <input type="number" name="min_price" placeholder="No min"></label>
+          <label>Max Price <input type="number" name="max_price" placeholder="No max"></label>
+        </div>
+        <div class="form-row">
+          <label>Min Year <input type="number" name="min_year" placeholder="No min"></label>
+          <label>Max Year <input type="number" name="max_year" placeholder="No max"></label>
+        </div>
+        <label>Poll Interval (minutes)
+          <input type="number" name="poll_interval_minutes" value="30" min="5">
+        </label>
+        <div class="form-actions">
+          <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail panel (vehicle or run) -->
+  <div id="listing-panel" class="panel">
+    <div class="panel-header">
+      <h3 id="panel-title"></h3>
+      <button class="btn btn-sm" onclick="closePanel()">Close</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

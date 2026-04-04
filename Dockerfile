@@ -12,8 +12,12 @@ RUN apt-get update && \
 WORKDIR /app
 COPY pyproject.toml .
 COPY carsearch/ carsearch/
+COPY web/ web/
 
 RUN pip install --no-cache-dir . && \
     playwright install chromium
 
-ENTRYPOINT ["python", "-m", "carsearch"]
+EXPOSE 8000
+
+# Default: run the web app. Override with "python -m carsearch" for CLI.
+CMD ["python", "-m", "web"]

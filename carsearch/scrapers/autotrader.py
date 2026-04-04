@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlencode
 
-from ..base import Filters, Listing, Scraper
+from ..base import Filters, Listing, Scraper, detect_fuel
 
 
 class AutoTraderScraper(Scraper):
@@ -141,13 +141,18 @@ class AutoTraderScraper(Scraper):
 
         # Transmission from subtitle
         transmission = "-"
-        if "dsg" in sub_lower or "auto" in sub_lower:
+        full_lower = title.lower()
+        if any(x in full_lower for x in ["dsg", " auto", "s tronic", "tiptronic", "s-tronic"]):
             transmission = "Automatic"
-        elif "manual" in sub_lower:
+        elif "manual" in full_lower:
             transmission = "Manual"
+
+        # Fuel type: try data-testid, fall back to title parsing
+        fuel_el = await card.query_selector('[data-testid="fuel-type"]')
+        fuel_type = (await fuel_el.inner_text()).strip() if fuel_el else detect_fuel(title)
 
         return Listing(
             source=self.name, title=title, price=price, year=year,
             mileage=mileage, location=location, link=link, body=body,
-            transmission=transmission,
+            transmission=transmission, fuel_type=fuel_type,
         )

@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlencode
 
-from ..base import Filters, Listing, Scraper
+from ..base import Filters, Listing, Scraper, detect_fuel, normalise_fuel
 
 
 PAGE_SIZE = 22
@@ -147,9 +147,13 @@ class MotorsScraper(Scraper):
         mileage = "-"
         body = "-"
         transmission = "-"
+        fuel_type = "-"
         body_types = {"hatchback", "estate", "saloon", "suv", "coupe", "convertible",
                       "mpv", "pickup", "van", "sedan", "cabriolet", "limousine"}
         trans_types = {"auto", "automatic", "manual", "semi-auto", "semi-automatic"}
+        fuel_types = {"petrol", "diesel", "electric", "hybrid",
+                      "petrol/electric", "diesel/electric",
+                      "plug-in hybrid", "mild hybrid"}
         specs = await card.query_selector_all(".result-card__vehicle-info li")
         for s in specs:
             text = (await s.inner_text()).strip().replace("\n", " ")
@@ -160,6 +164,11 @@ class MotorsScraper(Scraper):
                 body = text
             elif low in trans_types:
                 transmission = text
+            elif low in fuel_types:
+                fuel_type = normalise_fuel(text)
+
+        if fuel_type == "-":
+            fuel_type = detect_fuel(title)
 
         # Location: dealer name + distance
         dealer_el = await card.query_selector(".result-card__dealer")
@@ -189,4 +198,5 @@ class MotorsScraper(Scraper):
             link=link,
             body=body,
             transmission=transmission,
+            fuel_type=fuel_type,
         )
