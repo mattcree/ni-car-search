@@ -21,6 +21,9 @@
       <div id="home-row" class="watch-card" onclick="goHome()">
         <div class="watch-card-title">Feed</div>
       </div>
+      <div id="activity-row" class="watch-card" onclick="showGlobalActivity()">
+        <div class="watch-card-title">Poll History</div>
+      </div>
       <div id="catalogue-row" class="watch-card" onclick="showCatalogue()">
         <div class="watch-card-title">Catalogue</div>
         <div class="watch-card-meta" id="catalogue-row-meta"></div>
@@ -53,6 +56,11 @@
         <div id="tab-activity" class="tab-content">
           <div id="activity-log"></div>
         </div>
+      </div>
+
+      <!-- Global activity (poll history across all watches) -->
+      <div id="view-activity" class="view">
+        <div id="global-activity"></div>
       </div>
 
       <!-- Catalogue -->
@@ -95,10 +103,10 @@
         </div>
         <div class="form-row">
           <label>Location
-            <input type="text" name="location" value="northern-ireland" placeholder="e.g. belfast">
+            <select name="location" id="watch-location"></select>
           </label>
           <label>Radius (miles)
-            <input type="number" name="radius" placeholder="No limit">
+            <input type="number" name="radius" value="80" min="1" max="500" required>
           </label>
         </div>
         <div class="form-row">

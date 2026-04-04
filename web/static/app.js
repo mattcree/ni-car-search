@@ -75,6 +75,21 @@ function toast(msg) {
 
 const HEALTH_ICON = { healthy: "\u25cf", degraded: "\u25cf", failing: "\u25cf", unknown: "\u25cb" };
 const HEALTH_CLASS = { healthy: "health-ok", degraded: "health-warn", failing: "health-bad", unknown: "health-unknown" };
+const ALL_SCRAPERS = ["AutoTrader", "Gumtree", "Motors", "NIVehicleSales", "UsedCarsNI"];
+
+function renderRunScraperList(errObj, scraperCounts) {
+  return ALL_SCRAPERS.map(s => {
+    const msg = errObj[s];
+    const count = (scraperCounts || {})[s];
+    if (msg && String(msg).includes("0 results")) {
+      return `<div class="scraper-row warn"><span class="scraper-row-icon">\u26a0</span><span class="scraper-row-name">${esc(s)}</span><span class="scraper-row-detail">0 results</span></div>`;
+    } else if (msg) {
+      return `<div class="scraper-row err"><span class="scraper-row-icon">\u2717</span><span class="scraper-row-name">${esc(s)}</span><span class="scraper-row-detail">${esc(String(msg).substring(0, 60))}</span></div>`;
+    } else {
+      return `<div class="scraper-row ok"><span class="scraper-row-icon">\u2713</span><span class="scraper-row-name">${esc(s)}</span><span class="scraper-row-count">${count != null ? count : 0}</span></div>`;
+    }
+  }).join("");
+}
 
 /* ── sidebar ────────────────────────────────────────────────────────────── */
 
@@ -136,6 +151,7 @@ function switchTab(tab) {
 }
 
 async function showWatch(id) {
+  if (location.hash !== `#watch/${id}`) { location.hash = `#watch/${id}`; return; }
   currentWatchId = id;
   currentView = "watch";
   showView("view-watch");
@@ -164,6 +180,10 @@ async function showWatch(id) {
     </div>
     ${tags.length ? '<div class="watch-filters">' + tags.map(t => '<span class="tag">' + esc(String(t)) + '</span>').join("") + '</div>' : ''}
   `;
+
+  // Clear stale poll progress from another watch, then show if this watch is polling
+  hidePollProgress();
+  if (activePolls.has(id)) renderPollProgress(id);
 
   // Restore current tab
   switchTab(currentTab);
@@ -271,6 +291,32 @@ function renderVehicles() {
 
 /* ── activity tab ───────────────────────────────────────────────────────── */
 
+function renderRunCard(r, watchName) {
+  const errObj = (r.errors && r.errors !== "null") ? JSON.parse(r.errors) : {};
+  const hasRealError = Object.entries(errObj).some(([, v]) => !String(v).includes("0 results"));
+  const statusClass = !r.finished_at ? "running" : hasRealError ? "warn" : "ok";
+  const dur = duration(r.started_at, r.finished_at);
+
+  const scraperList = renderRunScraperList(errObj, r.scraper_counts);
+
+  return `
+  <div class="run-card ${statusClass}" onclick="toggleRunDetail(this, ${r.id})">
+    <div class="run-card-header">
+      <span class="run-time">${formatDate(r.started_at)}</span>
+      ${watchName ? `<span class="run-watch-name">${esc(watchName)}</span>` : ''}
+      <span class="run-summary">
+        ${r.total_found || 0} found
+        ${r.new_count ? ', <strong>' + r.new_count + ' new</strong>' : ''}
+        ${r.price_changed_count ? ', ' + r.price_changed_count + ' price changes' : ''}
+        ${r.gone_count ? ', ' + r.gone_count + ' gone' : ''}
+      </span>
+      ${dur ? '<span class="run-duration">' + dur + '</span>' : ''}
+    </div>
+    <div class="run-scraper-list">${scraperList}</div>
+    <div class="run-detail" style="display:none"></div>
+  </div>`;
+}
+
 async function loadActivity(watchId) {
   const container = document.getElementById("activity-log");
   container.innerHTML = '<p style="color:var(--text-muted)">Loading runs...</p>';
@@ -280,32 +326,7 @@ async function loadActivity(watchId) {
       container.innerHTML = '<p style="color:var(--text-muted)">No runs yet. Hit "Poll Now" to start.</p>';
       return;
     }
-    container.innerHTML = runs.map(r => {
-      const hasErrors = r.errors && r.errors !== "null";
-      const errObj = hasErrors ? JSON.parse(r.errors) : {};
-      const errCount = Object.keys(errObj).length;
-      const statusClass = !r.finished_at ? "running" : errCount ? "warn" : "ok";
-      const statusIcon = !r.finished_at ? '<span class="spinner"></span>' : errCount ? "\u26a0" : "\u2713";
-      const dur = duration(r.started_at, r.finished_at);
-
-      return `
-      <div class="run-card ${statusClass}" onclick="toggleRunDetail(this, ${r.id})">
-        <div class="run-card-header">
-          <span class="run-status">${statusIcon}</span>
-          <span class="run-time">${formatDate(r.started_at)}</span>
-          <span class="run-summary">
-            ${r.total_found || 0} found
-            ${r.new_count ? ', <strong>' + r.new_count + ' new</strong>' : ''}
-            ${r.new_source_count ? ', ' + r.new_source_count + ' cross-site' : ''}
-            ${r.price_changed_count ? ', ' + r.price_changed_count + ' price changes' : ''}
-            ${r.gone_count ? ', ' + r.gone_count + ' gone' : ''}
-          </span>
-          ${dur ? '<span class="run-duration">' + dur + '</span>' : ''}
-          ${errCount ? '<span class="run-errors">' + errCount + ' error' + (errCount > 1 ? 's' : '') + '</span>' : ''}
-        </div>
-        <div class="run-detail" style="display:none"></div>
-      </div>`;
-    }).join("");
+    container.innerHTML = runs.map(r => renderRunCard(r)).join("");
   } catch (err) { toast("Failed to load runs: " + err.message); }
 }
 
@@ -322,32 +343,6 @@ async function toggleRunDetail(card, runId) {
   try {
     const run = await api("GET", `/runs/${runId}`);
     let html = "";
-
-    // Scraper breakdown
-    if (run.run_events.length) {
-      const scrapers = {};
-      for (const e of run.run_events) {
-        if (!e.source) continue;
-        if (!scrapers[e.source]) scrapers[e.source] = { status: "unknown", count: null, error: null };
-        const s = scrapers[e.source];
-        switch (e.event_type) {
-          case "SCRAPER_START": s.status = "started"; break;
-          case "SCRAPER_PROGRESS": s.count = e.count; s.status = "running"; break;
-          case "SCRAPER_DONE": s.count = e.count; s.status = "done"; break;
-          case "SCRAPER_ERROR": s.status = "error"; s.error = e.message; break;
-          case "SCRAPER_RETRY": s.status = "retrying"; break;
-        }
-      }
-
-      html += '<div class="run-section"><div class="run-section-title">Scrapers</div>';
-      for (const [name, s] of Object.entries(scrapers)) {
-        const cls = s.status === "error" ? "error" : s.status === "done" ? "done" : "active";
-        const label = s.status === "error" ? esc(s.error || "failed")
-          : (s.count != null ? s.count + " listings" : "no results");
-        html += `<div class="run-scraper ${cls}"><span>${esc(name)}</span><span>${label}</span></div>`;
-      }
-      html += '</div>';
-    }
 
     // Vehicle events from this run
     if (run.vehicle_events.length) {
@@ -655,6 +650,24 @@ function hidePollProgress() {
 /* ── watch form ─────────────────────────────────────────────────────────── */
 
 let catalogueMakes = null; // cached on first load
+let locations = null; // cached on first load
+
+async function loadLocations() {
+  if (locations) return locations;
+  try {
+    locations = await api("GET", "/locations");
+  } catch {
+    locations = [{ name: "Lisburn", value: "lisburn" }];
+  }
+  return locations;
+}
+
+function populateLocationDropdown(selectEl, selectedValue) {
+  if (!locations) return;
+  selectEl.innerHTML = locations.map(l =>
+    `<option value="${esc(l.value)}" ${l.value === (selectedValue || 'lisburn') ? 'selected' : ''}>${esc(l.name)}</option>`
+  ).join("");
+}
 
 async function loadCatalogueMakes() {
   if (catalogueMakes !== null) return catalogueMakes;
@@ -742,6 +755,11 @@ function showWatchForm(watch) {
   }
   document.getElementById("modal-overlay").classList.add("open");
 
+  // Populate location dropdown
+  loadLocations().then(() => {
+    populateLocationDropdown(form.elements.location, watch ? watch.location : "lisburn");
+  });
+
   // Populate catalogue dropdowns
   populateMakeDropdown(form, watch ? watch.make : null).then(() => {
     if (watch && watch.make) {
@@ -772,8 +790,8 @@ async function submitWatch(e) {
   const data = {
     make: form.elements.make.value.trim().toLowerCase(),
     model: form.elements.model.value.trim().toLowerCase(),
-    location: form.elements.location.value || "northern-ireland",
-    radius: form.elements.radius.value ? parseInt(form.elements.radius.value) : null,
+    location: form.elements.location.value || "lisburn",
+    radius: parseInt(form.elements.radius.value) || 80,
     min_price: form.elements.min_price.value ? parseInt(form.elements.min_price.value) : null,
     max_price: form.elements.max_price.value ? parseInt(form.elements.max_price.value) : null,
     min_year: form.elements.min_year.value ? parseInt(form.elements.min_year.value) : null,
@@ -807,6 +825,7 @@ async function deleteWatch(id) {
 /* ── settings ───────────────────────────────────────────────────────────── */
 
 async function showSettings() {
+  if (location.hash !== "#settings") { location.hash = "#settings"; return; }
   currentWatchId = null; currentView = "settings"; renderWatchList(); updateSidebarHighlight(); showView("view-settings");
   try {
     const settings = await api("GET", "/settings");
@@ -827,9 +846,52 @@ async function saveSettings(e) {
 
 /* ── init ────────────────────────────────────────────────────────────────── */
 
+/* ── global activity (poll history) ──────────────────────────────────────── */
+
+async function showGlobalActivity() {
+  if (location.hash !== "#activity") { location.hash = "#activity"; return; }
+  currentWatchId = null;
+  currentView = "activity";
+  renderWatchList();
+  updateSidebarHighlight();
+  showView("view-activity");
+  await renderGlobalActivity();
+}
+
+async function renderGlobalActivity() {
+  const el = document.getElementById("global-activity");
+  el.innerHTML = '<p style="color:var(--ink-muted)">Loading poll history...</p>';
+
+  try {
+    // Load runs from all watches
+    const allRuns = [];
+    for (const w of watches) {
+      const runs = await api("GET", `/watches/${w.id}/runs?limit=20`);
+      for (const r of runs) {
+        r._watch_name = `${w.make} ${w.model}`;
+        allRuns.push(r);
+      }
+    }
+    // Sort by start time, newest first
+    allRuns.sort((a, b) => b.started_at.localeCompare(a.started_at));
+
+    if (!allRuns.length) {
+      el.innerHTML = '<div class="empty-state"><h2>No polls yet</h2><p>Poll a watch to see history here.</p></div>';
+      return;
+    }
+
+    el.innerHTML = `<h2 class="feed-title">Poll History</h2>` +
+      allRuns.map(r => renderRunCard(r, r._watch_name)).join("");
+  } catch (err) {
+    el.innerHTML = '<p style="color:var(--signal-gone)">Failed to load poll history.</p>';
+    toast("Failed to load poll history: " + err.message);
+  }
+}
+
 /* ── catalogue ───────────────────────────────────────────────────────────── */
 
 async function showCatalogue() {
+  if (location.hash !== "#catalogue") { location.hash = "#catalogue"; return; }
   currentWatchId = null;
   currentView = "catalogue";
   renderWatchList();
@@ -970,31 +1032,53 @@ async function runHarvest() {
 /* ── init ────────────────────────────────────────────────────────────────── */
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await loadLocations();
   await loadWatches();
-  await renderFeed();
-  updateSidebarHighlight();
+  navigate(location.hash);
 });
+
+window.addEventListener("hashchange", () => navigate(location.hash));
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { closeModal(); closePanel(); }
 });
 
 function goHome() {
-  currentWatchId = null;
-  currentView = "dashboard";
-  renderWatchList();
-  updateSidebarHighlight();
-  showView("view-empty");
-  renderFeed();
+  location.hash = "#feed";
+}
+
+function navigate(hash) {
+  // Parse hash and route to the right view
+  hash = hash || "#feed";
+  if (hash === "#feed" || hash === "#" || hash === "") {
+    currentWatchId = null;
+    currentView = "dashboard";
+    renderWatchList();
+    updateSidebarHighlight();
+    showView("view-empty");
+    renderFeed();
+  } else if (hash === "#activity") {
+    showGlobalActivity();
+  } else if (hash === "#catalogue") {
+    showCatalogue();
+  } else if (hash.startsWith("#catalogue/")) {
+    showCatalogue().then(() => {
+      const makeId = parseInt(hash.split("/")[1]);
+      if (makeId) showCatalogueMake(makeId);
+    });
+  } else if (hash === "#settings") {
+    showSettings();
+  } else if (hash.startsWith("#watch/")) {
+    const id = parseInt(hash.split("/")[1]);
+    if (id) showWatch(id);
+  }
 }
 
 let currentView = "dashboard"; // "dashboard" | "catalogue" | "watch" | "settings"
 
 function updateSidebarHighlight() {
-  const homeRow = document.getElementById("home-row");
-  const catRow = document.getElementById("catalogue-row");
-  const setRow = document.getElementById("settings-row");
-  if (homeRow) homeRow.classList.toggle("active", currentView === "dashboard");
-  if (catRow) catRow.classList.toggle("active", currentView === "catalogue");
-  if (setRow) setRow.classList.toggle("active", currentView === "settings");
+  for (const [id, view] of [["home-row","dashboard"],["activity-row","activity"],["catalogue-row","catalogue"],["settings-row","settings"]]) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("active", currentView === view);
+  }
 }

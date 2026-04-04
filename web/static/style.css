@@ -620,10 +620,77 @@ input:focus, select:focus { outline: none; border-color: var(--lead); }
 .run-card.warn .run-status { color: var(--signal-warn); }
 .run-card.running .run-status { color: var(--lead); }
 .run-time { color: var(--ink-faint); white-space: nowrap; font-size: var(--type-xs); }
+.run-watch-name { font-weight: 500; text-transform: capitalize; white-space: nowrap; font-size: var(--type-sm); }
 .run-summary { flex: 1; }
 .run-summary strong { color: var(--signal-new); }
 .run-duration { color: var(--ink-faint); font-size: var(--type-xs); }
 .run-errors { color: var(--signal-warn); font-size: var(--type-xs); font-weight: 500; }
+
+.run-scraper-list {
+  padding: var(--sp-1) 0 var(--sp-2);
+}
+.scraper-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  font-size: var(--type-xs);
+}
+.scraper-row-icon { width: 14px; text-align: center; flex-shrink: 0; }
+.scraper-row-name { min-width: 110px; font-weight: 500; }
+.scraper-row-count { font-variant-numeric: tabular-nums; font-weight: 600; }
+.scraper-row-detail { color: var(--ink-faint); }
+
+.scraper-row.ok .scraper-row-icon { color: var(--signal-new); }
+.scraper-row.ok .scraper-row-count { color: var(--signal-new); }
+.scraper-row.warn .scraper-row-icon { color: var(--signal-warn); }
+.scraper-row.warn .scraper-row-detail { color: var(--signal-warn); }
+.scraper-row.err .scraper-row-icon { color: var(--signal-gone); }
+.scraper-row.err .scraper-row-detail { color: var(--signal-gone); }
+
+.run-error-block {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: rgba(212, 105, 90, 0.06);
+  border-left: 2px solid var(--signal-gone);
+  border-radius: var(--radius);
+  font-size: var(--type-xs);
+}
+.run-error-line {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+}
+.run-error-source {
+  font-weight: 600;
+  color: var(--signal-gone);
+  min-width: 100px;
+}
+.run-error-msg {
+  color: var(--ink-muted);
+}
+
+.run-warn-block {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: rgba(212, 168, 67, 0.06);
+  border-left: 2px solid var(--signal-warn);
+  border-radius: var(--radius);
+  font-size: var(--type-xs);
+}
+.run-warn-line {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+}
+.run-warn-source {
+  font-weight: 600;
+  color: var(--signal-warn);
+  min-width: 100px;
+}
+.run-warn-msg {
+  color: var(--ink-faint);
+}
 
 .run-detail { padding: 0 0 var(--sp-4); border-top: 1px solid var(--rule); }
 .run-section { margin-top: var(--sp-3); }

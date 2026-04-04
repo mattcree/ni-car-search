@@ -31,34 +31,54 @@ class Listing:
     fuel_type: str = "-"
 
 
-NI_LOCATIONS = {
-    "belfast": "BT1 1AA",
-    "derry": "BT48 6HQ",
-    "londonderry": "BT48 6HQ",
-    "newry": "BT35 6BP",
-    "lisburn": "BT28 1AA",
-    "bangor": "BT20 4BN",
-    "ballymena": "BT43 5BS",
-    "craigavon": "BT65 5AQ",
-    "omagh": "BT78 1DQ",
-    "enniskillen": "BT74 7JD",
-    "coleraine": "BT52 1BE",
-    "antrim": "BT41 4AA",
-    "newtownards": "BT23 4YH",
-    "downpatrick": "BT30 6LZ",
-    "armagh": "BT61 7QA",
-    "dungannon": "BT70 1AR",
-    "cookstown": "BT80 8BG",
-    "strabane": "BT82 8DS",
-    "ballyclare": "BT39 9AA",
-    "larne": "BT40 1RN",
-    "carrickfergus": "BT38 7DG",
-    "portadown": "BT62 1AA",
-    "lurgan": "BT66 6AA",
-    "magherafelt": "BT45 5AA",
-    "dungiven": "BT47 4AA",
-    "newcastle": "BT33 0AA",
+LOCATIONS = {
+    # NI county towns / capitals
+    "belfast": "BT1 1AA",           # Antrim (city)
+    "lisburn": "BT28 1AA",          # Antrim
+    "antrim": "BT41 4AA",           # Antrim
+    "ballymena": "BT43 5BS",        # Antrim
+    "carrickfergus": "BT38 7DG",    # Antrim
+    "larne": "BT40 1RN",            # Antrim
+    "newtownards": "BT23 4YH",      # Down
+    "downpatrick": "BT30 6LZ",      # Down
+    "bangor": "BT20 4BN",           # Down
+    "newry": "BT35 6BP",            # Down
+    "armagh": "BT61 7QA",           # Armagh
+    "craigavon": "BT65 5AQ",        # Armagh
+    "portadown": "BT62 1AA",        # Armagh
+    "lurgan": "BT66 6AA",           # Armagh
+    "derry": "BT48 6HQ",            # Londonderry
+    "londonderry": "BT48 6HQ",      # Londonderry
+    "coleraine": "BT52 1BE",        # Londonderry
+    "magherafelt": "BT45 5AA",      # Londonderry
+    "omagh": "BT78 1DQ",            # Tyrone
+    "dungannon": "BT70 1AR",        # Tyrone
+    "cookstown": "BT80 8BG",        # Tyrone
+    "strabane": "BT82 8DS",         # Tyrone
+    "enniskillen": "BT74 7JD",      # Fermanagh
+
+    # UK capitals
+    "london": "SW1A 1AA",
+    "edinburgh": "EH1 1YZ",
+    "cardiff": "CF10 1EP",
+
+    # Major UK cities
+    "manchester": "M1 1AE",
+    "birmingham": "B1 1BB",
+    "leeds": "LS1 1UR",
+    "glasgow": "G1 1DU",
+    "liverpool": "L1 1JD",
+    "newcastle upon tyne": "NE1 4ST",
+    "sheffield": "S1 1WB",
+    "bristol": "BS1 1JG",
+    "nottingham": "NG1 1AB",
+    "southampton": "SO14 7LP",
+    "aberdeen": "AB10 1AQ",
+    "inverness": "IV1 1EP",
 }
+
+# Backward compat alias
+NI_LOCATIONS = LOCATIONS
 
 
 def resolve_location(location: str) -> str:
@@ -74,9 +94,9 @@ class Filters:
     max_price: int | None = None
     min_year: int | None = None
     max_year: int | None = None
-    postcode: str = "BT1 1AA"
-    location: str = "northern-ireland"
-    radius: int = 0  # miles, 0 = no limit
+    postcode: str = "BT28 1AA"
+    location: str = "lisburn"
+    radius: int = 80  # miles, required
     max_pages: int = 0  # 0 = no limit
 
 

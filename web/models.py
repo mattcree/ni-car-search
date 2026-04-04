@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 class WatchCreate(BaseModel):
     make: str
     model: str
-    location: str = "northern-ireland"
-    radius: int | None = Field(None, ge=0)
+    location: str = "lisburn"
+    radius: int = Field(80, ge=1, le=500)
     min_price: int | None = Field(None, ge=0)
     max_price: int | None = Field(None, ge=0)
     min_year: int | None = Field(None, ge=1900, le=2100)
@@ -22,7 +22,7 @@ class WatchUpdate(BaseModel):
     make: str | None = None
     model: str | None = None
     location: str | None = None
-    radius: int | None = Field(None, ge=0)
+    radius: int | None = Field(None, ge=1, le=500)
     min_price: int | None = Field(None, ge=0)
     max_price: int | None = Field(None, ge=0)
     min_year: int | None = Field(None, ge=1900, le=2100)
@@ -130,6 +130,7 @@ class ScrapeRunResponse(BaseModel):
     price_changed_count: int | None
     returned_count: int | None
     errors: str | None
+    scraper_counts: dict[str, int] = {}
 
 
 class WatchStatsResponse(BaseModel):

@@ -85,6 +85,15 @@ def health(conn: Conn = Depends(db_dependency)):
     return {"status": "ok"}
 
 
+# ── locations ───────────────────────────────────────────────────────────────
+
+
+@app.get("/api/locations")
+def get_locations():
+    from carsearch.base import LOCATIONS
+    return [{"name": name.title(), "value": name} for name in sorted(LOCATIONS.keys())]
+
+
 # ── feed ────────────────────────────────────────────────────────────────────
 
 
@@ -509,7 +518,18 @@ def watch_runs(
         "SELECT * FROM scrape_runs WHERE watch_id=? ORDER BY started_at DESC LIMIT ?",
         (watch_id, limit),
     ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        # Attach per-scraper counts from run_events
+        scraper_counts = conn.execute(
+            """SELECT source, count FROM run_events
+            WHERE run_id=? AND event_type='SCRAPER_DONE' AND source IS NOT NULL""",
+            (r["id"],),
+        ).fetchall()
+        d["scraper_counts"] = {row["source"]: row["count"] for row in scraper_counts}
+        result.append(d)
+    return result
 
 
 @app.get("/api/runs/{run_id}", response_model=RunDetailResponse)
