@@ -21,6 +21,7 @@ Limitations:
 
 from __future__ import annotations
 
+import re
 from urllib.parse import urlencode
 
 from ..base import Filters, Listing, Scraper, detect_fuel, normalise_fuel
@@ -98,7 +99,7 @@ class GumtreeScraper(Scraper):
 
             page_results = []
             for article in articles:
-                listing = await self._extract_listing(article, filters)
+                listing = await self._extract_listing(article, make, model, filters)
                 if listing and listing.link not in seen_links:
                     seen_links.add(listing.link)
                     page_results.append(listing)
@@ -118,13 +119,28 @@ class GumtreeScraper(Scraper):
 
         return results
 
-    async def _extract_listing(self, article, filters: Filters) -> Listing | None:
+    @staticmethod
+    def _title_matches(title: str, make: str, model: str) -> bool:
+        """Check that a listing title plausibly matches the searched make/model."""
+        # Normalize: lowercase, strip punctuation and spaces for comparison
+        def _norm(s: str) -> str:
+            return re.sub(r"[\s.\-]+", "", s.lower())
+
+        t = _norm(title)
+        # Model is the more specific check — make may be absent from title
+        # (e.g. "ID.3 Pro Performance" without "Volkswagen")
+        return _norm(model) in t
+
+    async def _extract_listing(self, article, make: str, model: str, filters: Filters) -> Listing | None:
         link_el = await article.query_selector('a[data-q="search-result-anchor"]')
         href = (await link_el.get_attribute("href")) if link_el else ""
         link = f"https://www.gumtree.com{href}" if href else "-"
 
         title_el = await article.query_selector('[data-q="tile-title"]')
         title = (await title_el.inner_text()).strip() if title_el else "-"
+
+        if not self._title_matches(title, make, model):
+            return None
 
         price_el = await article.query_selector('[data-q="tile-price"]')
         price = (await price_el.inner_text()).strip() if price_el else "-"
