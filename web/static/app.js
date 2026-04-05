@@ -124,7 +124,7 @@ function renderWatchList() {
     <div class="watch-card ${w.id === currentWatchId ? 'active' : ''}"
          onclick="showWatch(${w.id})">
       <div class="watch-card-title">
-        <span class="${hc}">${hi}</span> ${esc(w.make)} ${esc(w.model)}
+        <span class="${hc}">${hi}</span> ${esc(w.make_display || w.make)} ${esc(w.model_display || w.model)}
       </div>
       <div class="watch-card-meta">
         <span>${w.active_count} active</span>
@@ -173,7 +173,7 @@ async function showWatch(id) {
 
   hdr.innerHTML = `
     <div class="watch-title-row">
-      <h2>${esc(watch.make)} ${esc(watch.model)}</h2>
+      <h2>${esc(watch.make_display || watch.make)} ${esc(watch.model_display || watch.model)}</h2>
       <button class="btn btn-sm" onclick="editWatch(${watch.id})">Edit</button>
       <button class="btn btn-sm btn-danger" onclick="deleteWatch(${watch.id})">Delete</button>
       <button class="btn btn-sm btn-primary" id="poll-btn" onclick="pollWatch(${watch.id})">Poll Now</button>
@@ -411,7 +411,7 @@ async function renderFeed() {
   for (const w of watches) {
     if (w.next_run) {
       const mins = Math.max(0, Math.round((new Date(w.next_run) - Date.now()) / 60000));
-      nextPoll = `Next poll: ${esc(w.make)} ${esc(w.model)} in ${mins}m`;
+      nextPoll = `Next poll: ${esc(w.make_display || w.make)} ${esc(w.model_display || w.model)} in ${mins}m`;
       break;
     }
   }
@@ -456,7 +456,7 @@ async function renderFeed() {
         return `<div class="feed-item${isNew ? ' feed-item-new' : ''}" onclick="showVehicleFromFeed(${e.vehicle_id}, ${e.watch_id})">
           <span class="feed-time">${relativeTime(e.timestamp)}</span>
           <span class="feed-signal ${cls}">${label}</span>
-          <span class="feed-watch">${esc(e.watch_make)} ${esc(e.watch_model)}</span>
+          <span class="feed-watch">${esc(e.watch_make_display || e.watch_make)} ${esc(e.watch_model_display || e.watch_model)}</span>
           <span class="feed-desc">${desc}</span>
         </div>`;
       }).join("");
@@ -876,7 +876,7 @@ async function renderGlobalActivity() {
     for (const w of watches) {
       const runs = await api("GET", `/watches/${w.id}/runs?limit=20`);
       for (const r of runs) {
-        r._watch_name = `${w.make} ${w.model}`;
+        r._watch_name = `${w.make_display || w.make} ${w.model_display || w.model}`;
         allRuns.push(r);
       }
     }

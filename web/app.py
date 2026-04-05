@@ -117,6 +117,8 @@ def get_feed(
             v.year AS vehicle_year, v.mileage_bucket,
             v.transmission AS vehicle_transmission,
             w.id AS watch_id, w.make AS watch_make, w.model AS watch_model,
+            COALESCE(cm.canonical_name, w.make) AS watch_make_display,
+            COALESCE(cmo.canonical_name, w.model) AS watch_model_display,
             (SELECT l.title FROM listings l
              WHERE l.vehicle_id = v.id
              ORDER BY LENGTH(l.title) DESC LIMIT 1) AS vehicle_title,
@@ -126,6 +128,9 @@ def get_feed(
         FROM vehicle_events ve
         JOIN vehicles v ON ve.vehicle_id = v.id
         JOIN watches w ON v.watch_id = w.id
+        LEFT JOIN catalogue_makes cm ON cm.normalized = w.make
+        LEFT JOIN catalogue_models cmo
+            ON cmo.make_id = cm.id AND cmo.normalized = w.model
         {where}
         ORDER BY ve.timestamp DESC
         LIMIT ?""",
@@ -154,6 +159,25 @@ def get_feed_count(
 
 def _watch_with_counts(conn: Conn, row: sqlite3.Row) -> dict:
     w = dict(row)
+
+    # Look up canonical display names from catalogue
+    cat_make = conn.execute(
+        "SELECT canonical_name FROM catalogue_makes WHERE normalized=?",
+        (w["make"],),
+    ).fetchone()
+    if cat_make:
+        w["make_display"] = cat_make["canonical_name"]
+        cat_model = conn.execute(
+            """SELECT cmo.canonical_name FROM catalogue_models cmo
+            JOIN catalogue_makes cm ON cmo.make_id = cm.id
+            WHERE cm.normalized=? AND cmo.normalized=?""",
+            (w["make"], w["model"]),
+        ).fetchone()
+        w["model_display"] = cat_model["canonical_name"] if cat_model else w["model"]
+    else:
+        w["make_display"] = w["make"]
+        w["model_display"] = w["model"]
+
     stats = conn.execute(
         """SELECT
             COUNT(DISTINCT v.id) AS vehicles,
@@ -295,6 +319,25 @@ async def poll_watch(watch_id: int, conn: Conn = Depends(db_dependency)):
         raise HTTPException(404, detail="Watch not found")
 
     watch = dict(row)
+
+    # Add canonical display names from catalogue
+    cat_make = conn.execute(
+        "SELECT canonical_name FROM catalogue_makes WHERE normalized=?",
+        (watch["make"],),
+    ).fetchone()
+    if cat_make:
+        watch["make_display"] = cat_make["canonical_name"]
+        cat_model = conn.execute(
+            """SELECT cmo.canonical_name FROM catalogue_models cmo
+            JOIN catalogue_makes cm ON cmo.make_id = cm.id
+            WHERE cm.normalized=? AND cmo.normalized=?""",
+            (watch["make"], watch["model"]),
+        ).fetchone()
+        watch["model_display"] = cat_model["canonical_name"] if cat_model else watch["model"]
+    else:
+        watch["make_display"] = watch["make"]
+        watch["model_display"] = watch["model"]
+
     progress_queue: asyncio.Queue = asyncio.Queue()
 
     def on_progress(event: dict):

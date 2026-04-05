@@ -84,7 +84,9 @@ async def send_notification(watch: dict, result: dict) -> None:
     if not summary:
         return
 
-    title = f"{watch['make'].title()} {watch['model'].title()}: {', '.join(summary)}"
+    make_display = watch.get("make_display") or watch["make"]
+    model_display = watch.get("model_display") or watch["model"]
+    title = f"{make_display} {model_display}: {', '.join(summary)}"
     body = _build_body(result.get("run_id"))
 
     try:

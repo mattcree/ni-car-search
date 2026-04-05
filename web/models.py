@@ -44,6 +44,8 @@ class WatchResponse(BaseModel):
     id: int
     make: str
     model: str
+    make_display: str = ""
+    model_display: str = ""
     location: str
     radius: int | None
     min_price: int | None
@@ -183,6 +185,8 @@ class FeedEventResponse(BaseModel):
     watch_id: int
     watch_make: str
     watch_model: str
+    watch_make_display: str = ""
+    watch_model_display: str = ""
 
 
 class SchedulerJobResponse(BaseModel):

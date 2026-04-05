@@ -121,7 +121,7 @@ a:hover { text-decoration: underline; }
 }
 .watch-card:hover { background: var(--ground-hover); }
 .watch-card.active { background: var(--ground-hover); border-left: 3px solid var(--lead); }
-.watch-card-title { font-weight: 600; text-transform: capitalize; font-size: var(--type-base); }
+.watch-card-title { font-weight: 600; font-size: var(--type-base); }
 .watch-card-meta { font-size: var(--type-xs); color: var(--ink-muted); margin-top: var(--sp-1); }
 .watch-card-stats { display: flex; gap: var(--sp-3); margin-top: var(--sp-1); font-size: var(--type-xs); }
 .watch-card-stats .stat-vehicles { color: var(--lead); }
@@ -188,7 +188,6 @@ a:hover { text-decoration: underline; }
   margin-bottom: var(--sp-4);
 }
 .watch-title-row h2 {
-  text-transform: capitalize;
   flex: 1;
   font-size: var(--type-xl);
   font-weight: 700;
@@ -627,7 +626,7 @@ input:focus, select:focus { outline: none; border-color: var(--lead); }
 .run-card.warn .run-status { color: var(--signal-warn); }
 .run-card.running .run-status { color: var(--lead); }
 .run-time { color: var(--ink-faint); white-space: nowrap; font-size: var(--type-xs); }
-.run-watch-name { font-weight: 500; text-transform: capitalize; white-space: nowrap; font-size: var(--type-sm); }
+.run-watch-name { font-weight: 500; white-space: nowrap; font-size: var(--type-sm); }
 .run-summary { flex: 1; }
 .run-summary strong { color: var(--signal-new); }
 .run-duration { color: var(--ink-faint); font-size: var(--type-xs); }
@@ -823,7 +822,6 @@ input:focus, select:focus { outline: none; border-color: var(--lead); }
   font-weight: 500;
   color: var(--ink-muted);
   white-space: nowrap;
-  text-transform: capitalize;
 }
 .feed-desc {
   font-size: var(--type-sm);
@@ -861,7 +859,7 @@ input:focus, select:focus { outline: none; border-color: var(--lead); }
   font-size: var(--type-base);
 }
 .dashboard-watch:hover { background: var(--ground-hover); }
-.dashboard-watch-name { font-weight: 600; text-transform: capitalize; flex: 1; }
+.dashboard-watch-name { font-weight: 600; flex: 1; }
 .dashboard-watch-stats { color: var(--ink-muted); font-size: var(--type-sm); }
 .dashboard-watch-last { color: var(--ink-faint); font-size: var(--type-xs); }
 

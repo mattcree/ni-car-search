@@ -50,11 +50,30 @@ async def _run_watch(watch_id: int) -> None:
         row = conn.execute(
             "SELECT * FROM watches WHERE id = ? AND enabled = 1", (watch_id,)
         ).fetchone()
-    if not row:
-        log.info("Watch %d not found or disabled, skipping", watch_id)
-        return
+        if not row:
+            log.info("Watch %d not found or disabled, skipping", watch_id)
+            return
 
-    watch = dict(row)
+        watch = dict(row)
+
+        # Add canonical display names from catalogue
+        cat_make = conn.execute(
+            "SELECT canonical_name FROM catalogue_makes WHERE normalized=?",
+            (watch["make"],),
+        ).fetchone()
+        if cat_make:
+            watch["make_display"] = cat_make["canonical_name"]
+            cat_model = conn.execute(
+                """SELECT cmo.canonical_name FROM catalogue_models cmo
+                JOIN catalogue_makes cm ON cmo.make_id = cm.id
+                WHERE cm.normalized=? AND cmo.normalized=?""",
+                (watch["make"], watch["model"]),
+            ).fetchone()
+            watch["model_display"] = cat_model["canonical_name"] if cat_model else watch["model"]
+        else:
+            watch["make_display"] = watch["make"]
+            watch["model_display"] = watch["model"]
+
     try:
         result = await execute_scrape(watch)
         if result["new"] or result["price_changed"]:
