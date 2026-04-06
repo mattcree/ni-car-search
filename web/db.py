@@ -6,7 +6,7 @@ from typing import Generator
 
 from .config import DB_PATH
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _connect() -> sqlite3.Connection:
@@ -51,6 +51,7 @@ def init_db() -> None:
                 min_year INTEGER,
                 max_year INTEGER,
                 poll_interval_minutes INTEGER NOT NULL DEFAULT 30,
+                poll_start_time TEXT,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 last_polled_at TEXT
@@ -211,6 +212,18 @@ def init_db() -> None:
         """)
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES ('schema_version', ?)",
+            (str(SCHEMA_VERSION),),
+        )
+
+        # Migrations for existing databases
+        existing_cols = {
+            row[1] for row in conn.execute("PRAGMA table_info(watches)").fetchall()
+        }
+        if "poll_start_time" not in existing_cols:
+            conn.execute("ALTER TABLE watches ADD COLUMN poll_start_time TEXT")
+
+        conn.execute(
+            "UPDATE settings SET value = ? WHERE key = 'schema_version'",
             (str(SCHEMA_VERSION),),
         )
         conn.commit()

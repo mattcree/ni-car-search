@@ -16,6 +16,7 @@ class WatchCreate(BaseModel):
     min_year: int | None = Field(None, ge=1900, le=2100)
     max_year: int | None = Field(None, ge=1900, le=2100)
     poll_interval_minutes: int = Field(30, ge=5, le=1440)
+    poll_start_time: str | None = None
 
 
 class WatchUpdate(BaseModel):
@@ -28,6 +29,7 @@ class WatchUpdate(BaseModel):
     min_year: int | None = Field(None, ge=1900, le=2100)
     max_year: int | None = Field(None, ge=1900, le=2100)
     poll_interval_minutes: int | None = Field(None, ge=5, le=1440)
+    poll_start_time: str | None = None
     enabled: bool | None = None
 
 
@@ -53,6 +55,7 @@ class WatchResponse(BaseModel):
     min_year: int | None
     max_year: int | None
     poll_interval_minutes: int
+    poll_start_time: str | None = None
     enabled: int
     created_at: str
     last_polled_at: str | None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, time, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -89,6 +90,25 @@ def is_in_flight(watch_id: int) -> bool:
     return watch_id in _in_flight
 
 
+def _compute_start_date(start_time_str: str | None) -> datetime | None:
+    """Convert an HH:MM start time into the nearest future anchor point."""
+    if not start_time_str:
+        return None
+    try:
+        h, m = map(int, start_time_str.split(":"))
+        anchor = time(h, m)
+    except (ValueError, TypeError):
+        return None
+
+    now = datetime.now(timezone.utc)
+    start = now.replace(hour=anchor.hour, minute=anchor.minute, second=0, microsecond=0)
+    # If the time already passed today, use yesterday's anchor so the
+    # interval grid still aligns correctly (APScheduler will skip past dates).
+    if start > now:
+        start -= timedelta(days=1)
+    return start
+
+
 def schedule_watch(watch: dict) -> None:
     """Add or replace the polling job for a watch."""
     job_id = f"watch_{watch['id']}"
@@ -96,9 +116,15 @@ def schedule_watch(watch: dict) -> None:
     # Jitter: +/-20% of the interval, minimum 30 seconds
     jitter = max(30, int(interval * 60 * 0.2))
 
+    start_date = _compute_start_date(watch.get("poll_start_time"))
+
+    trigger_kwargs: dict = dict(minutes=interval, jitter=jitter)
+    if start_date:
+        trigger_kwargs["start_date"] = start_date
+
     scheduler.add_job(
         _run_watch,
-        IntervalTrigger(minutes=interval, jitter=jitter),
+        IntervalTrigger(**trigger_kwargs),
         id=job_id,
         replace_existing=True,
         args=[watch["id"]],
@@ -106,8 +132,9 @@ def schedule_watch(watch: dict) -> None:
         max_instances=1,
     )
     log.info(
-        "Scheduled watch %d (%s %s) every %dm (\u00b1%ds jitter)",
+        "Scheduled watch %d (%s %s) every %dm (\u00b1%ds jitter)%s",
         watch["id"], watch["make"], watch["model"], interval, jitter,
+        f" anchored at {watch['poll_start_time']}" if watch.get("poll_start_time") else "",
     )
 
 

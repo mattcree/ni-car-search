@@ -173,6 +173,8 @@ async function showWatch(id) {
   if (watch.max_year) tags.push("up to " + watch.max_year);
   if (watch.location && watch.location !== "northern-ireland") tags.push(watch.location);
   if (watch.radius) tags.push(watch.radius + " miles");
+  if (watch.poll_start_time) tags.push("from " + watch.poll_start_time);
+  tags.push("every " + watch.poll_interval_minutes + "m");
 
   const pollActive = !!watch.enabled;
   hdr.innerHTML = `
@@ -767,6 +769,7 @@ function showWatchForm(watch) {
     form.elements.min_year.value = watch.min_year || "";
     form.elements.max_year.value = watch.max_year || "";
     form.elements.poll_interval_minutes.value = watch.poll_interval_minutes;
+    form.elements.poll_start_time.value = watch.poll_start_time || "";
   } else {
     document.getElementById("watch-form-title").textContent = "Add Watch";
     form.elements.id.value = "";
@@ -817,6 +820,7 @@ async function submitWatch(e) {
     min_year: form.elements.min_year.value ? parseInt(form.elements.min_year.value) : null,
     max_year: form.elements.max_year.value ? parseInt(form.elements.max_year.value) : null,
     poll_interval_minutes: parseInt(form.elements.poll_interval_minutes.value) || 30,
+    poll_start_time: form.elements.poll_start_time.value || null,
   };
   try {
     const id = form.elements.id.value;

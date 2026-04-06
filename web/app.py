@@ -230,12 +230,13 @@ def create_watch(body: WatchCreate, conn: Conn = Depends(db_dependency)):
     cur = conn.execute(
         """INSERT INTO watches
         (make, model, location, radius, min_price, max_price,
-         min_year, max_year, poll_interval_minutes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+         min_year, max_year, poll_interval_minutes, poll_start_time, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             body.make.strip().lower(), body.model.strip().lower(),
             body.location, body.radius, body.min_price, body.max_price,
-            body.min_year, body.max_year, body.poll_interval_minutes, now,
+            body.min_year, body.max_year, body.poll_interval_minutes,
+            body.poll_start_time, now,
         ),
     )
     conn.commit()
@@ -256,7 +257,7 @@ def get_watch(watch_id: int, conn: Conn = Depends(db_dependency)):
 
 _WATCH_COLUMNS = {
     "make", "model", "location", "radius", "min_price", "max_price",
-    "min_year", "max_year", "poll_interval_minutes", "enabled",
+    "min_year", "max_year", "poll_interval_minutes", "poll_start_time", "enabled",
 }
 
 

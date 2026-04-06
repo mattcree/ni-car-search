@@ -125,9 +125,14 @@
           <label>Min Year <input type="number" name="min_year" placeholder="No min"></label>
           <label>Max Year <input type="number" name="max_year" placeholder="No max"></label>
         </div>
-        <label>Poll Interval (minutes)
-          <input type="number" name="poll_interval_minutes" value="30" min="5">
-        </label>
+        <div class="form-row">
+          <label>Poll Interval (minutes)
+            <input type="number" name="poll_interval_minutes" value="30" min="5">
+          </label>
+          <label>Start Time (HH:MM)
+            <input type="time" name="poll_start_time" placeholder="e.g. 08:00">
+          </label>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">Save</button>
