@@ -127,6 +127,9 @@ a:hover { text-decoration: underline; }
 .watch-card-stats .stat-vehicles { color: var(--lead); }
 .watch-card-stats .stat-active { color: var(--signal-new); }
 .watch-card-stats .stat-gone { color: var(--ink-faint); }
+.watch-card.watch-inactive { opacity: 0.55; }
+.badge { display: inline-block; padding: 1px var(--sp-1); border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; vertical-align: middle; margin-left: var(--sp-1); }
+.badge-inactive { background: var(--ink-faint); color: var(--ground); }
 
 #content {
   flex: 1;
@@ -195,12 +198,29 @@ a:hover { text-decoration: underline; }
   line-height: var(--leading-tight);
 }
 
+.watch-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
 .watch-filters {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-1);
-  margin-bottom: var(--sp-4);
 }
+.poll-status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+.poll-status-label { font-size: var(--type-xs); color: var(--ink-muted); }
+.btn-poll-active { background: rgba(94, 184, 122, 0.15); color: var(--signal-new); border-color: rgba(94, 184, 122, 0.3); }
+.btn-poll-active:hover { background: rgba(94, 184, 122, 0.25); }
+.btn-poll-inactive { background: rgba(107, 101, 96, 0.15); color: var(--ink-faint); border-color: rgba(107, 101, 96, 0.3); }
+.btn-poll-inactive:hover { background: rgba(107, 101, 96, 0.25); }
 
 .tag {
   display: inline-block;

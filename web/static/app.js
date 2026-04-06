@@ -120,11 +120,14 @@ function renderWatchList() {
       nextLabel = `Next: ${mins}m`;
     }
 
+    const inactive = !w.enabled;
+
     return `
-    <div class="watch-card ${w.id === currentWatchId ? 'active' : ''}"
+    <div class="watch-card ${w.id === currentWatchId ? 'active' : ''} ${inactive ? 'watch-inactive' : ''}"
          onclick="showWatch(${w.id})">
       <div class="watch-card-title">
         <span class="${hc}">${hi}</span> ${esc(w.make_display || w.make)} ${esc(w.model_display || w.model)}
+        ${inactive ? '<span class="badge badge-inactive">Inactive</span>' : ''}
       </div>
       <div class="watch-card-meta">
         <span>${w.active_count} active</span>
@@ -171,6 +174,7 @@ async function showWatch(id) {
   if (watch.location && watch.location !== "northern-ireland") tags.push(watch.location);
   if (watch.radius) tags.push(watch.radius + " miles");
 
+  const pollActive = !!watch.enabled;
   hdr.innerHTML = `
     <div class="watch-title-row">
       <h2>${esc(watch.make_display || watch.make)} ${esc(watch.model_display || watch.model)}</h2>
@@ -178,7 +182,16 @@ async function showWatch(id) {
       <button class="btn btn-sm btn-danger" onclick="deleteWatch(${watch.id})">Delete</button>
       <button class="btn btn-sm btn-primary" id="poll-btn" onclick="pollWatch(${watch.id})">Poll Now</button>
     </div>
-    ${tags.length ? '<div class="watch-filters">' + tags.map(t => '<span class="tag">' + esc(String(t)) + '</span>').join("") + '</div>' : ''}
+    <div class="watch-meta-row">
+      ${tags.length ? '<div class="watch-filters">' + tags.map(t => '<span class="tag">' + esc(String(t)) + '</span>').join("") + '</div>' : ''}
+      <div class="poll-status">
+        <span class="poll-status-label">Poll status:</span>
+        <button class="btn btn-sm ${pollActive ? 'btn-poll-active' : 'btn-poll-inactive'}"
+                onclick="togglePollStatus(${watch.id}, ${!pollActive})">
+          ${pollActive ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+    </div>
   `;
 
   // Clear stale poll progress from another watch, then show if this watch is polling
@@ -827,6 +840,15 @@ async function deleteWatch(id) {
     currentWatchId = null; showView("view-empty"); toast("Watch deleted");
     await loadWatches(); renderDashboard();
   } catch (err) { toast("Failed to delete watch: " + err.message); }
+}
+
+async function togglePollStatus(id, enabled) {
+  try {
+    await api("PUT", `/watches/${id}`, { enabled });
+    toast(enabled ? "Polling activated" : "Polling deactivated");
+    await loadWatches();
+    if (currentWatchId === id) showWatch(id);
+  } catch (err) { toast("Failed to update poll status: " + err.message); }
 }
 
 /* ── settings ───────────────────────────────────────────────────────────── */
